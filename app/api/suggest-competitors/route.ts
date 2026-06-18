@@ -10,15 +10,19 @@ export interface CompetitorSuggestion {
 }
 
 export async function POST(req: NextRequest) {
-  const { description } = await req.json() as { description: string }
+  const { description, exclude = [] } = await req.json() as { description: string; exclude?: string[] }
 
   if (!description?.trim()) {
     return NextResponse.json({ error: 'Description required' }, { status: 400 })
   }
 
+  const excludeClause = exclude.length > 0
+    ? `\n\nDo NOT suggest these companies (already shown): ${exclude.join(', ')}.`
+    : ''
+
   const suggestions = await callClaudeJSON<CompetitorSuggestion[]>(
     SUGGEST_COMPETITORS_SYSTEM,
-    `We make: ${description.trim()}\n\nSuggest 12 competitors to monitor.`
+    `We make: ${description.trim()}\n\nSuggest 12 competitors to monitor.${excludeClause}`
   )
 
   return NextResponse.json({ suggestions })

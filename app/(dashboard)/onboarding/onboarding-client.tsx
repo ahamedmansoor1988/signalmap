@@ -6,7 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import { THEME_CONFIG } from '@/components/map/mock-data'
 import type { Theme } from '@/components/map/mock-data'
 import type { CompetitorSuggestion } from '@/app/api/suggest-competitors/route'
-import { Sparkles, ArrowRight, Check, Loader2, Globe } from 'lucide-react'
+import { Sparkles, ArrowRight, Check, Loader2, Globe, Plus, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
 interface Props {
@@ -24,6 +24,21 @@ export default function OnboardingClient({ orgId }: Props) {
   const [suggestions, setSuggestions] = useState<CompetitorSuggestion[]>([])
   const [selected, setSelected] = useState<Set<number>>(new Set())
   const [error, setError] = useState<string | null>(null)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [customName, setCustomName] = useState('')
+  const [customUrl, setCustomUrl] = useState('')
+  const [showCustom, setShowCustom] = useState(false)
+
+  async function fetchSuggestions(exclude: string[] = []) {
+    const res = await fetch('/api/suggest-competitors', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ description, exclude }),
+    })
+    const data = await res.json() as { suggestions?: CompetitorSuggestion[]; error?: string }
+    if (data.error || !data.suggestions) throw new Error(data.error ?? 'No suggestions returned')
+    return data.suggestions
+  }
 
   async function handleDescribe(e: React.FormEvent) {
     e.preventDefault()
@@ -32,20 +47,55 @@ export default function OnboardingClient({ orgId }: Props) {
     setError(null)
 
     try {
-      const res = await fetch('/api/suggest-competitors', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ description }),
-      })
-      const data = await res.json() as { suggestions?: CompetitorSuggestion[]; error?: string }
-      if (data.error || !data.suggestions) throw new Error(data.error ?? 'No suggestions returned')
-      setSuggestions(data.suggestions)
-      setSelected(new Set(data.suggestions.map((_, i) => i)))
+      const s = await fetchSuggestions()
+      setSuggestions(s)
+      setSelected(new Set(s.map((_, i) => i)))
       setStep('select')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong')
       setStep('describe')
     }
+  }
+
+  async function handleSuggestMore() {
+    setLoadingMore(true)
+    try {
+      const exclude = suggestions.map((s) => s.name)
+      const more = await fetchSuggestions(exclude)
+      setSuggestions((prev) => {
+        const next = [...prev, ...more]
+        // auto-select the new ones
+        setSelected((sel) => {
+          const updated = new Set(sel)
+          for (let i = prev.length; i < next.length; i++) updated.add(i)
+          return updated
+        })
+        return next
+      })
+    } catch {
+      // silently fail — user still has their existing list
+    } finally {
+      setLoadingMore(false)
+    }
+  }
+
+  function addCustom() {
+    if (!customName.trim() || !customUrl.trim()) return
+    const url = customUrl.startsWith('http') ? customUrl : `https://${customUrl}`
+    const custom: CompetitorSuggestion = {
+      name: customName.trim(),
+      website: url.trim(),
+      theme: 'Content',
+      reason: 'Added manually',
+    }
+    setSuggestions((prev) => {
+      const next = [...prev, custom]
+      setSelected((sel) => new Set(Array.from(sel).concat(next.length - 1)))
+      return next
+    })
+    setCustomName('')
+    setCustomUrl('')
+    setShowCustom(false)
   }
 
   function toggleAll() {
@@ -79,7 +129,6 @@ export default function OnboardingClient({ orgId }: Props) {
           .single()
         if (compErr) throw compErr
 
-        // Track homepage + /pricing for each
         const baseUrl = c.website.replace(/\/$/, '')
         await supabase.from('tracked_pages').insert([
           { competitor_id: comp.id, url: baseUrl, label: 'Home' },
@@ -140,10 +189,10 @@ export default function OnboardingClient({ orgId }: Props) {
             </button>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-4">
             {suggestions.map((c, i) => {
               const isSelected = selected.has(i)
-              const cfg = THEME_CONFIG[c.theme as Theme]
+              const cfg = THEME_CONFIG[c.theme as Theme] ?? THEME_CONFIG['Content']
               return (
                 <button
                   key={i}
@@ -183,6 +232,60 @@ export default function OnboardingClient({ orgId }: Props) {
               )
             })}
           </div>
+
+          {/* Add your own */}
+          {showCustom ? (
+            <div className="border border-gray-200 rounded-xl p-4 mb-4 bg-white">
+              <p className="text-gray-700 text-sm font-medium mb-3">Add a competitor manually</p>
+              <div className="flex gap-2">
+                <input
+                  value={customName}
+                  onChange={(e) => setCustomName(e.target.value)}
+                  placeholder="Company name"
+                  className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-violet-500"
+                />
+                <input
+                  value={customUrl}
+                  onChange={(e) => setCustomUrl(e.target.value)}
+                  placeholder="website.com"
+                  className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-violet-500"
+                />
+                <button
+                  onClick={addCustom}
+                  disabled={!customName.trim() || !customUrl.trim()}
+                  className="px-4 py-2 bg-violet-600 hover:bg-violet-500 disabled:opacity-40 text-white text-sm rounded-lg transition-colors"
+                >
+                  Add
+                </button>
+                <button
+                  onClick={() => setShowCustom(false)}
+                  className="px-3 py-2 text-gray-400 hover:text-gray-600 text-sm transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center gap-3 mb-6">
+              <button
+                onClick={handleSuggestMore}
+                disabled={loadingMore}
+                className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 border border-gray-200 hover:border-gray-300 px-3 py-1.5 rounded-lg transition-all"
+              >
+                {loadingMore
+                  ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  : <RefreshCw className="w-3.5 h-3.5" />}
+                Suggest more
+              </button>
+              <button
+                onClick={() => setShowCustom(true)}
+                className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 border border-gray-200 hover:border-gray-300 px-3 py-1.5 rounded-lg transition-all"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                Add your own
+              </button>
+            </div>
+          )}
 
           {error && <p className="text-red-600 text-sm mb-4">{error}</p>}
 
