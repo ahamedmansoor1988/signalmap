@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import AddCompetitorForm from '@/components/competitor/add-competitor-form'
 import CompetitorList from '@/components/competitor/competitor-list'
@@ -20,9 +20,10 @@ export default async function SettingsPage() {
   let orgId: string
 
   if (!membership) {
-    // First-time user: auto-create a personal org
+    // First-time user: auto-create a personal org (service role bypasses RLS)
+    const service = await createServiceClient()
     const slug = user.email?.split('@')[0]?.toLowerCase().replace(/[^a-z0-9]/g, '-') ?? 'my-org'
-    const { data: newOrg } = await supabase
+    const { data: newOrg } = await service
       .from('organizations')
       .insert({ name: 'My Organization', slug: `${slug}-${Date.now()}` })
       .select()
@@ -32,7 +33,7 @@ export default async function SettingsPage() {
       return <div className="p-8 text-red-600">Failed to create organization. Check Supabase keys.</div>
     }
 
-    await supabase.from('org_members').insert({ org_id: newOrg.id, user_id: user.id, role: 'admin' })
+    await service.from('org_members').insert({ org_id: newOrg.id, user_id: user.id, role: 'admin' })
     orgId = newOrg.id
   } else {
     orgId = membership.org_id

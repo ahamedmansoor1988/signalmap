@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import OnboardingClient from './onboarding-client'
 
@@ -9,7 +9,7 @@ export default async function OnboardingPage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  // Get or create org
+  // Get or create org — use service client to bypass RLS on insert
   const { data: membership } = await supabase
     .from('org_members')
     .select('org_id')
@@ -19,8 +19,9 @@ export default async function OnboardingPage() {
   let orgId: string
 
   if (!membership) {
+    const service = await createServiceClient()
     const slug = user.email?.split('@')[0]?.toLowerCase().replace(/[^a-z0-9]/g, '-') ?? 'my-org'
-    const { data: newOrg } = await supabase
+    const { data: newOrg } = await service
       .from('organizations')
       .insert({ name: 'My Organization', slug: `${slug}-${Date.now()}` })
       .select()
@@ -28,7 +29,7 @@ export default async function OnboardingPage() {
 
     if (!newOrg) redirect('/settings')
 
-    await supabase.from('org_members').insert({ org_id: newOrg.id, user_id: user.id, role: 'admin' })
+    await service.from('org_members').insert({ org_id: newOrg.id, user_id: user.id, role: 'admin' })
     orgId = newOrg.id
   } else {
     orgId = membership.org_id
