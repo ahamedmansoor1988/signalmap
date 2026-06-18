@@ -1,76 +1,89 @@
 # SignalMap — Sprint Status
 
+## Sprint 2 — COMPLETE ✅
+**Date:** 2026-06-18
+
+### Completed
+- [x] **Add Competitor form** — settings page with name + website + tracked URLs, saves to Supabase
+- [x] **Competitor list** — shows all tracked competitors with risk badge, delete, links to profile
+- [x] **Auto org creation** — first-time user automatically gets a personal org on settings visit
+- [x] **Market Map wired to DB** — loads real competitors from Supabase, falls back to 12 mock competitors when DB is empty. "Demo data" banner with link to Settings when showing mock data.
+- [x] **Playwright crawler** (`lib/crawler.ts`) — uses playwright-core with graceful fallback to fetch for serverless environments
+- [x] **Diff engine** (`lib/diff.ts`) — line-by-line Myers diff using `diff` package, returns added/removed lines + HTML diff markup
+- [x] **`/api/crawl`** — crawls a tracked page, stores snapshot, returns snapshot IDs for diffing
+- [x] **`/api/diff`** — takes two snapshot IDs, computes diff, calls Claude for AI analysis, stores change record, updates competitor risk score
+- [x] **`/api/cron`** — full crawl-and-diff pipeline, processes 20 pages per run, protected by CRON_SECRET
+- [x] **`vercel.json`** — cron schedule set to 8am UTC daily
+- [x] **Change Explorer** (`/changes`) — lists all detected changes with AI signal, theme badge, risk score
+- [x] **Change Detail** (`/changes/[id]`) — full view with signal, AI summary, impact bullets, suggested actions, risk score bar, HTML diff
+- [x] **Competitor Profile** (`/competitor/[id]`) — stats, monitored pages with last crawl time, full activity feed
+- [x] **Competitors list** (`/competitor`) — all competitors with risk levels, links to profiles
+- [x] **TypeScript types fixed** — added `Relationships` arrays to all tables, `CompositeTypes` to schema. Zero type errors.
+- [x] Zero compile errors, dev server clean on port 3003
+
+### .env.local — keys needed before full pipeline works
+```
+NEXT_PUBLIC_SUPABASE_URL=https://smmcvglmwrddtyaebwnu.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=<Supabase dashboard → Project Settings → API>
+SUPABASE_SERVICE_ROLE_KEY=<Supabase dashboard → Project Settings → API>
+ANTHROPIC_API_KEY=<console.anthropic.com>
+CRON_SECRET=<any random string, e.g. openssl rand -hex 32>
+```
+
+### DB Migration — run this before testing
+Paste `supabase/migrations/20240101000000_initial_schema.sql` into the Supabase SQL editor.
+Then enable Google OAuth in Supabase Auth → Providers → Google.
+
+### How the data pipeline works
+1. User adds competitor + pages in `/settings`
+2. Cron hits `/api/cron` every 24h with `Authorization: Bearer <CRON_SECRET>`
+3. For each tracked page: crawl → snapshot → diff against previous → Claude analysis → store change
+4. Changes appear in `/changes` and competitor risk scores update on the Market Map
+
+---
+
 ## Sprint 1 — COMPLETE ✅
 **Date:** 2026-06-18
 
 ### Completed
 - [x] Next.js 14 App Router + TypeScript strict mode + Tailwind CSS + shadcn/ui
-- [x] Full folder structure per spec (app routes, components, lib, docs, supabase)
-- [x] Supabase client configured: browser client (`lib/supabase/client.ts`) and server client (`lib/supabase/server.ts`)
-- [x] Full TypeScript types for all DB tables (`lib/supabase/types.ts`)
-- [x] Auth: Google OAuth + magic link via Supabase (`app/(auth)/login/page.tsx`)
-- [x] Auth middleware protecting all dashboard routes, redirects to /login
-- [x] Auth callback route at `/auth/callback`
-- [x] DB migration SQL for all tables with RLS (`supabase/migrations/20240101000000_initial_schema.sql`)
-- [x] Market Map canvas — force-directed physics simulation, animated cluster formation
-  - 12 mock competitors across 5 themes
-  - Nodes sized by risk score
-  - Theme clusters with radial gradient halos + color-coded labels
-  - Click node → right drawer (CompetitorDrawer) with risk score, signals, strategic summary
-  - Search filter + theme filter buttons
-  - Replay animation button
-- [x] AI layer: `lib/ai.ts` — all Anthropic calls centralized, JSON parsing with fence stripping
-- [x] All 5 prompts: summarize, classify, diff, risk-score, digest
-- [x] API routes stubbed: `/api/crawl`, `/api/summarize`, `/api/diff`, `/api/digest`
-- [x] Dashboard nav sidebar with all routes
-- [x] Dev server running on port 3003 with no errors
-- [x] `.env.local` in gitignore
-
-### What's in .env.local (needs real values)
-```
-NEXT_PUBLIC_SUPABASE_URL=https://smmcvglmwrddtyaebwnu.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=<fill in from Supabase dashboard>
-SUPABASE_SERVICE_ROLE_KEY=<fill in from Supabase dashboard>
-ANTHROPIC_API_KEY=<fill in>
-```
-
-### Known Issues / Blockers
-- Supabase keys need to be filled in `.env.local` before auth works end-to-end
-- DB migration needs to be run against the Supabase project manually:
-  `npx supabase db push` or copy SQL from `supabase/migrations/` into Supabase SQL editor
-- Google OAuth provider must be configured in Supabase dashboard
-- Market Map uses mock data; real data wiring is Sprint 2
+- [x] Full folder structure per spec
+- [x] Supabase browser/server clients with typed schema
+- [x] Auth: Google OAuth + magic link with middleware protection
+- [x] DB migration SQL with RLS for all 9 tables
+- [x] Market Map canvas — force-directed physics, 12 mock competitors, 5 theme clusters, click drawer
+- [x] AI layer: `lib/ai.ts` + all 5 prompts
+- [x] API routes stubbed
+- [x] Dashboard nav sidebar
+- [x] Dev server on port 3003
 
 ---
 
-## Sprint 2 — TODO
+## Sprint 3 — TODO
 
 ### Priority Order
-1. **DB + Auth end-to-end**: Fill .env.local keys, run migration, test Google OAuth
-2. **Real competitor data**: Add competitor form → `/app/(dashboard)/settings/page.tsx`
-   - Form: name, website, tracked URLs
-   - Save to Supabase `competitors` + `tracked_pages`
-   - Load from DB on Market Map (replace mock data)
-3. **Crawler**: Implement `lib/crawler.ts` with Playwright
-   - Crawl tracked pages, store snapshots in Supabase Storage
-   - Cron job via API route + Vercel cron
-4. **Change detection**: `lib/diff.ts` + `/api/diff` 
-   - Compare latest two snapshots
-   - Run through AI summarize prompt
-   - Store in `changes` table
-5. **Competitor Profile drawer**: Wire real data from DB
-6. **Change Explorer page**: List of changes with before/after diff view
-7. **Realtime**: Supabase Realtime for live map updates when new changes detected
+1. **Weekly Digest** (`/digest`) — generate AI briefing from the week's changes, send to Slack
+2. **Trend Timeline** — chart theme activity across competitors over time
+3. **Battle Room** — head-to-head comparison page
+4. **Realtime map updates** — Supabase Realtime subscription so map nodes pulse when new changes detected
+5. **Manual crawl trigger** — button in settings to trigger a crawl immediately (no waiting for cron)
+6. **Slack webhook** — `/api/webhooks/slack` for digest delivery
 
 ---
 
 ## Architecture Decisions
 
 ### Why Canvas API for Market Map?
-D3.js or react-force-graph add significant bundle weight and complex abstractions. A raw Canvas 2D API with a simple spring physics simulation gives full visual control, 60fps performance, and zero dependencies. The physics runs in requestAnimationFrame — no external physics engine needed.
+No D3.js or react-force-graph — a raw Canvas 2D API with spring physics gives full visual control, 60fps, zero dependencies.
 
 ### Why shadcn v4 + Base UI?
-The project was initialized with the latest shadcn CLI which now uses `@base-ui/react` instead of Radix UI. The API is similar enough to not require component rewrites. CSS was normalized to use hsl() variables instead of oklch() for Tailwind v3 compatibility.
+shadcn CLI now scaffolds with @base-ui/react. CSS normalized to hsl() for Tailwind v3 compatibility.
 
 ### Why raw fetch for Anthropic?
-Per spec — no LangChain, no Vercel AI SDK. All calls go through `lib/ai.ts` which is a thin wrapper: builds the request, calls the API, strips markdown fences, returns parsed JSON.
+Per spec. All calls in lib/ai.ts — thin wrapper, strips fences, returns parsed JSON.
+
+### Crawler fallback strategy
+playwright-core is used when the binary is available (local dev). Falls back to fetch() for Vercel serverless where binary can't be bundled. For production Playwright support on Vercel, use @sparticuz/chromium-min.
+
+### Supabase TypeScript types
+Hand-written types with full Relationships arrays (matching supabase gen types format) to enable proper TypeScript inference for the Supabase JS client. Zero any casts in production code paths.

@@ -22,6 +22,7 @@ export interface Database {
           slug?: string
           created_at?: string
         }
+        Relationships: []
       }
       org_members: {
         Row: {
@@ -45,6 +46,15 @@ export interface Database {
           role?: string
           created_at?: string
         }
+        Relationships: [
+          {
+            foreignKeyName: 'org_members_org_id_fkey'
+            columns: ['org_id']
+            isOneToOne: false
+            referencedRelation: 'organizations'
+            referencedColumns: ['id']
+          }
+        ]
       }
       competitors: {
         Row: {
@@ -74,6 +84,15 @@ export interface Database {
           risk_score?: number
           created_at?: string
         }
+        Relationships: [
+          {
+            foreignKeyName: 'competitors_org_id_fkey'
+            columns: ['org_id']
+            isOneToOne: false
+            referencedRelation: 'organizations'
+            referencedColumns: ['id']
+          }
+        ]
       }
       tracked_pages: {
         Row: {
@@ -100,6 +119,15 @@ export interface Database {
           last_crawled_at?: string | null
           created_at?: string
         }
+        Relationships: [
+          {
+            foreignKeyName: 'tracked_pages_competitor_id_fkey'
+            columns: ['competitor_id']
+            isOneToOne: false
+            referencedRelation: 'competitors'
+            referencedColumns: ['id']
+          }
+        ]
       }
       page_snapshots: {
         Row: {
@@ -126,6 +154,15 @@ export interface Database {
           storage_path?: string | null
           crawled_at?: string
         }
+        Relationships: [
+          {
+            foreignKeyName: 'page_snapshots_tracked_page_id_fkey'
+            columns: ['tracked_page_id']
+            isOneToOne: false
+            referencedRelation: 'tracked_pages'
+            referencedColumns: ['id']
+          }
+        ]
       }
       changes: {
         Row: {
@@ -173,6 +210,15 @@ export interface Database {
           suggested_actions?: Json | null
           detected_at?: string
         }
+        Relationships: [
+          {
+            foreignKeyName: 'changes_tracked_page_id_fkey'
+            columns: ['tracked_page_id']
+            isOneToOne: false
+            referencedRelation: 'tracked_pages'
+            referencedColumns: ['id']
+          }
+        ]
       }
       watchlists: {
         Row: {
@@ -193,6 +239,15 @@ export interface Database {
           name?: string
           created_at?: string
         }
+        Relationships: [
+          {
+            foreignKeyName: 'watchlists_org_id_fkey'
+            columns: ['org_id']
+            isOneToOne: false
+            referencedRelation: 'organizations'
+            referencedColumns: ['id']
+          }
+        ]
       }
       watchlist_competitors: {
         Row: {
@@ -207,6 +262,22 @@ export interface Database {
           watchlist_id?: string
           competitor_id?: string
         }
+        Relationships: [
+          {
+            foreignKeyName: 'watchlist_competitors_watchlist_id_fkey'
+            columns: ['watchlist_id']
+            isOneToOne: false
+            referencedRelation: 'watchlists'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'watchlist_competitors_competitor_id_fkey'
+            columns: ['competitor_id']
+            isOneToOne: false
+            referencedRelation: 'competitors'
+            referencedColumns: ['id']
+          }
+        ]
       }
       digests: {
         Row: {
@@ -233,10 +304,20 @@ export interface Database {
           sent_at?: string | null
           created_at?: string
         }
+        Relationships: [
+          {
+            foreignKeyName: 'digests_org_id_fkey'
+            columns: ['org_id']
+            isOneToOne: false
+            referencedRelation: 'organizations'
+            referencedColumns: ['id']
+          }
+        ]
       }
     }
     Views: Record<string, never>
     Functions: Record<string, never>
     Enums: Record<string, never>
+    CompositeTypes: Record<string, never>
   }
 }
