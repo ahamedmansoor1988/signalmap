@@ -4,6 +4,7 @@ import { crawlPage } from '@/lib/crawler'
 import { computeDiff } from '@/lib/diff'
 import { callClaudeJSON } from '@/lib/ai'
 import { SUMMARIZE_SYSTEM } from '@/lib/prompts/summarize'
+import { extractPageData, diffParsedPages, changeTypeFromPageType, calculateRiskScores } from '@/lib/extractor'
 
 export const runtime = 'nodejs'
 export const maxDuration = 300
@@ -18,8 +19,6 @@ interface SummarizeResult {
   suggested_actions: string[]
 }
 
-// Vercel Cron: runs every 24h
-// vercel.json: { "crons": [{ "path": "/api/cron", "schedule": "0 8 * * *" }] }
 export async function GET(req: NextRequest) {
   const authHeader = req.headers.get('authorization')
   if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
@@ -28,12 +27,13 @@ export async function GET(req: NextRequest) {
 
   const supabase = await createServiceClient()
   const results: Array<{ page_id: string; url: string; status: string; change_id?: string }> = []
+  const today = new Date().toISOString().split('T')[0]
 
   const { data: pages } = await supabase
     .from('tracked_pages')
     .select('id, url, competitor_id')
     .order('last_crawled_at', { ascending: true, nullsFirst: true })
-    .limit(20) // Process 20 pages per cron run
+    .limit(20)
 
   if (!pages?.length) {
     return NextResponse.json({ message: 'No pages to crawl', results })
@@ -43,6 +43,7 @@ export async function GET(req: NextRequest) {
     try {
       const crawled = await crawlPage(page.url)
 
+      // 1. Store raw snapshot (existing)
       const { data: newSnap } = await supabase
         .from('page_snapshots')
         .insert({
@@ -64,7 +65,51 @@ export async function GET(req: NextRequest) {
         .update({ last_crawled_at: crawled.crawledAt })
         .eq('id', page.id)
 
-      // Get previous snapshot
+      // 2. Extract structured data and store in competitor_snapshots
+      const parsed = await extractPageData(page.url, crawled.text)
+      await supabase
+        .from('competitor_snapshots')
+        .upsert({
+          competitor_id: page.competitor_id,
+          tracked_page_id: page.id,
+          snapshot_date: today,
+          page_type: parsed.page_type,
+          raw_text: crawled.text.slice(0, 10000),
+          parsed_data: parsed as unknown as import('@/lib/supabase/types').Json,
+        }, { onConflict: 'tracked_page_id,snapshot_date' })
+
+      // 3. Compare with yesterday's structured snapshot
+      const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0]
+      const { data: prevSnapshot } = await supabase
+        .from('competitor_snapshots')
+        .select('parsed_data')
+        .eq('tracked_page_id', page.id)
+        .eq('snapshot_date', yesterday)
+        .maybeSingle()
+
+      if (prevSnapshot?.parsed_data) {
+        const diff = diffParsedPages(
+          prevSnapshot.parsed_data as unknown as typeof parsed,
+          parsed
+        )
+        if (diff && (diff.added.length > 0 || diff.removed.length > 0)) {
+          const summaryLines = [
+            diff.added.length > 0 ? `Added: ${diff.added.slice(0, 3).join(' · ')}` : '',
+            diff.removed.length > 0 ? `Removed: ${diff.removed.slice(0, 3).join(' · ')}` : '',
+          ].filter(Boolean).join(' | ')
+
+          await supabase.from('competitor_diffs').insert({
+            competitor_id: page.competitor_id,
+            tracked_page_id: page.id,
+            change_type: changeTypeFromPageType(parsed.page_type),
+            summary: summaryLines || parsed.summary,
+            old_value: { key_items: (prevSnapshot.parsed_data as unknown as typeof parsed).key_items },
+            new_value: { key_items: parsed.key_items },
+          })
+        }
+      }
+
+      // 4. Classic text diff + AI analysis (existing flow)
       const { data: prevSnap } = await supabase
         .from('page_snapshots')
         .select('id, text_content')
@@ -79,15 +124,15 @@ export async function GET(req: NextRequest) {
         continue
       }
 
-      const diff = computeDiff(prevSnap.text_content, crawled.text)
-      if (!diff.hasChanges) {
+      const textDiff = computeDiff(prevSnap.text_content, crawled.text)
+      if (!textDiff.hasChanges) {
         results.push({ page_id: page.id, url: page.url, status: 'no_changes' })
         continue
       }
 
       const diffSummary = [
-        `REMOVED:\n${diff.removedLines.slice(0, 20).map((l) => `- ${l}`).join('\n')}`,
-        `ADDED:\n${diff.addedLines.slice(0, 20).map((l) => `+ ${l}`).join('\n')}`,
+        `REMOVED:\n${textDiff.removedLines.slice(0, 20).map((l) => `- ${l}`).join('\n')}`,
+        `ADDED:\n${textDiff.addedLines.slice(0, 20).map((l) => `+ ${l}`).join('\n')}`,
       ].join('\n\n')
 
       const ai = await callClaudeJSON<SummarizeResult>(SUMMARIZE_SYSTEM, diffSummary, 1024)
@@ -98,7 +143,7 @@ export async function GET(req: NextRequest) {
           tracked_page_id: page.id,
           before_snapshot_id: prevSnap.id,
           after_snapshot_id: newSnap.id,
-          diff_html: diff.diffHtml,
+          diff_html: textDiff.diffHtml,
           ai_summary: ai.summary,
           ai_signal: ai.signal,
           confidence: ai.confidence,
@@ -118,6 +163,37 @@ export async function GET(req: NextRequest) {
       results.push({ page_id: page.id, url: page.url, status: 'change_detected', change_id: change?.id })
     } catch (err) {
       results.push({ page_id: page.id, url: page.url, status: `error: ${String(err)}` })
+    }
+  }
+
+  // 5. Update risk_score_history for all affected competitors
+  const competitorIds = Array.from(new Set(pages.map((p) => p.competitor_id)))
+  for (const competitorId of competitorIds) {
+    try {
+      const { data: allDiffs } = await supabase
+        .from('competitor_diffs')
+        .select('change_type, detected_at')
+        .eq('competitor_id', competitorId)
+
+      if (allDiffs) {
+        const scores = calculateRiskScores(allDiffs)
+        await supabase
+          .from('risk_score_history')
+          .upsert({
+            competitor_id: competitorId,
+            scored_at: today,
+            ...scores,
+          }, { onConflict: 'competitor_id,scored_at' })
+
+        if (scores.total > 0) {
+          await supabase
+            .from('competitors')
+            .update({ risk_score: scores.total })
+            .eq('id', competitorId)
+        }
+      }
+    } catch {
+      // non-fatal
     }
   }
 

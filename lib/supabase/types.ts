@@ -314,6 +314,102 @@ export interface Database {
           }
         ]
       }
+      competitor_snapshots: {
+        Row: {
+          id: string
+          competitor_id: string
+          tracked_page_id: string
+          snapshot_date: string
+          page_type: string
+          raw_text: string | null
+          parsed_data: Json | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          competitor_id: string
+          tracked_page_id: string
+          snapshot_date?: string
+          page_type?: string
+          raw_text?: string | null
+          parsed_data?: Json | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          competitor_id?: string
+          tracked_page_id?: string
+          snapshot_date?: string
+          page_type?: string
+          raw_text?: string | null
+          parsed_data?: Json | null
+          created_at?: string
+        }
+        Relationships: []
+      }
+      competitor_diffs: {
+        Row: {
+          id: string
+          competitor_id: string
+          tracked_page_id: string
+          change_type: string
+          detected_at: string
+          summary: string | null
+          old_value: Json | null
+          new_value: Json | null
+        }
+        Insert: {
+          id?: string
+          competitor_id: string
+          tracked_page_id: string
+          change_type?: string
+          detected_at?: string
+          summary?: string | null
+          old_value?: Json | null
+          new_value?: Json | null
+        }
+        Update: {
+          id?: string
+          competitor_id?: string
+          tracked_page_id?: string
+          change_type?: string
+          detected_at?: string
+          summary?: string | null
+          old_value?: Json | null
+          new_value?: Json | null
+        }
+        Relationships: []
+      }
+      risk_score_history: {
+        Row: {
+          id: string
+          competitor_id: string
+          scored_at: string
+          product_velocity: number
+          messaging_overlap: number
+          market_reach: number
+          total: number
+        }
+        Insert: {
+          id?: string
+          competitor_id: string
+          scored_at?: string
+          product_velocity?: number
+          messaging_overlap?: number
+          market_reach?: number
+          total?: number
+        }
+        Update: {
+          id?: string
+          competitor_id?: string
+          scored_at?: string
+          product_velocity?: number
+          messaging_overlap?: number
+          market_reach?: number
+          total?: number
+        }
+        Relationships: []
+      }
     }
     Views: Record<string, never>
     Functions: {
