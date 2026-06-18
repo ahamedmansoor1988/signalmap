@@ -23,17 +23,24 @@ export default async function SettingsPage() {
     // First-time user: auto-create a personal org (service role bypasses RLS)
     const service = await createServiceClient()
     const slug = user.email?.split('@')[0]?.toLowerCase().replace(/[^a-z0-9]/g, '-') ?? 'my-org'
-    const { data: newOrg } = await service
+    const { data: newOrg, error: orgErr } = await service
       .from('organizations')
       .insert({ name: 'My Organization', slug: `${slug}-${Date.now()}` })
       .select()
       .single()
 
     if (!newOrg) {
-      return <div className="p-8 text-red-600">Failed to create organization. Check Supabase keys.</div>
+      console.error('[settings] org create failed:', orgErr)
+      return (
+        <div className="p-8">
+          <p className="text-red-600 font-medium">Failed to create organization.</p>
+          <pre className="mt-2 text-xs text-red-400 bg-red-50 p-3 rounded-lg">{JSON.stringify(orgErr, null, 2)}</pre>
+        </div>
+      )
     }
 
-    await service.from('org_members').insert({ org_id: newOrg.id, user_id: user.id, role: 'admin' })
+    const { error: memberErr } = await service.from('org_members').insert({ org_id: newOrg.id, user_id: user.id, role: 'admin' })
+    if (memberErr) console.error('[settings] member insert failed:', memberErr)
     orgId = newOrg.id
   } else {
     orgId = membership.org_id
