@@ -10,7 +10,6 @@ export default async function SettingsPage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  // Get or create org for this user
   const { data: membership } = await supabase
     .from('org_members')
     .select('org_id, organizations(id, name, slug)')
@@ -20,15 +19,14 @@ export default async function SettingsPage() {
   let orgId: string
 
   if (!membership) {
-    // First-time user: auto-create a personal org (service role bypasses RLS)
     const slug = user.email?.split('@')[0]?.toLowerCase().replace(/[^a-z0-9]/g, '-') ?? 'my-org'
-    const { data: newOrg, error: orgErr } = await supabase
-      .from('organizations')
-      .insert({ name: 'My Organization', slug: `${slug}-${Date.now()}` })
-      .select()
-      .single()
+    const { data: newOrgId, error: orgErr } = await supabase.rpc('create_user_org', {
+      p_user_id: user.id,
+      p_name: 'My Organization',
+      p_slug: `${slug}-${Date.now()}`,
+    })
 
-    if (!newOrg) {
+    if (orgErr || !newOrgId) {
       console.error('[settings] org create failed:', orgErr)
       return (
         <div className="p-8">
@@ -38,8 +36,7 @@ export default async function SettingsPage() {
       )
     }
 
-    await supabase.from('org_members').insert({ org_id: newOrg.id, user_id: user.id, role: 'admin' })
-    orgId = newOrg.id
+    orgId = newOrgId as string
   } else {
     orgId = membership.org_id
   }
@@ -58,7 +55,6 @@ export default async function SettingsPage() {
           <p className="text-gray-500 text-sm mt-1">Manage competitors and tracked pages</p>
         </div>
 
-        {/* Add Competitor */}
         <section className="mb-8">
           <h2 className="text-gray-900 text-sm font-semibold mb-4">Add Competitor</h2>
           <div className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
@@ -66,7 +62,6 @@ export default async function SettingsPage() {
           </div>
         </section>
 
-        {/* Competitor List */}
         <section>
           <h2 className="text-gray-900 text-sm font-semibold mb-4">
             Tracked Competitors
