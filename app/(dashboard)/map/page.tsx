@@ -36,24 +36,29 @@ export default async function MapPage() {
       if (!dbCompetitors || dbCompetitors.length === 0) redirect('/onboarding')
 
       if (dbCompetitors && dbCompetitors.length > 0) {
-        competitors = dbCompetitors.map((c) => {
-          // Pick theme from most recent change
+        const themes = ['AI Features', 'Pricing', 'Enterprise', 'GTM', 'Content'] as const
+        type Theme = typeof themes[number]
+
+        competitors = dbCompetitors.map((c, idx) => {
           const allChanges = (c.changes as Array<{ changes: Array<{ theme: string | null; ai_signal: string | null; detected_at: string; risk_score: number | null }> }>)
             .flatMap((tp) => tp.changes)
             .sort((a, b) => new Date(b.detected_at).getTime() - new Date(a.detected_at).getTime())
 
           const latestChange = allChanges[0]
-          const themes = ['AI Features', 'Pricing', 'Enterprise', 'GTM', 'Content'] as const
-          type Theme = typeof themes[number]
-          const theme: Theme = (themes.includes(latestChange?.theme as Theme) ? latestChange.theme : 'Content') as Theme
+
+          // Use theme from latest signal if available; otherwise spread evenly by index
+          // so competitors don't all pile into the same cluster before cron runs
+          const theme: Theme = (themes.includes(latestChange?.theme as Theme)
+            ? latestChange.theme
+            : themes[idx % themes.length]) as Theme
 
           return {
             id: c.id,
             name: c.name,
             website: c.website,
-            risk_score: c.risk_score,
+            risk_score: c.risk_score > 0 ? c.risk_score : 40 + (idx % 5) * 8,
             theme,
-            last_signal: latestChange?.ai_signal ?? 'No signals detected yet',
+            last_signal: latestChange?.ai_signal ?? 'No signals yet — cron runs daily at 8am UTC',
             signals_count: allChanges.length,
             description: `Tracking ${c.website}`,
           }

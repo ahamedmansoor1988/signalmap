@@ -148,35 +148,37 @@ export default function MarketMap({ competitors, isLiveData }: Props) {
         }
       })
 
-      // Physics
+      // Physics — run for first 250 ticks then let nodes rest
       const nodes = nodesRef.current
-      nodes.forEach((a) => {
-        const springK = 0.06
-        a.vx += (a.targetX - a.x) * springK
-        a.vy += (a.targetY - a.y) * springK
+      if (tickRef.current < 250) {
+        nodes.forEach((a) => {
+          const springK = 0.06
+          a.vx += (a.targetX - a.x) * springK
+          a.vy += (a.targetY - a.y) * springK
 
-        nodes.forEach((b) => {
-          if (a === b) return
-          const dx = a.x - b.x
-          const dy = a.y - b.y
-          const dist = Math.max(Math.hypot(dx, dy), 1)
-          const minDist = riskToRadius(a.risk_score) + riskToRadius(b.risk_score) + 12
-          if (dist < minDist) {
-            const force = (minDist - dist) / dist * 0.4
-            a.vx += dx * force
-            a.vy += dy * force
-          }
+          nodes.forEach((b) => {
+            if (a === b) return
+            const dx = a.x - b.x
+            const dy = a.y - b.y
+            const dist = Math.max(Math.hypot(dx, dy), 1)
+            const minDist = riskToRadius(a.risk_score) + riskToRadius(b.risk_score) + 12
+            if (dist < minDist) {
+              const force = (minDist - dist) / dist * 0.4
+              a.vx += dx * force
+              a.vy += dy * force
+            }
+          })
+
+          a.vx *= 0.82
+          a.vy *= 0.82
+          a.x += a.vx
+          a.y += a.vy
+
+          const r = riskToRadius(a.risk_score)
+          a.x = Math.max(r + 10, Math.min(canvas.width - r - 10, a.x))
+          a.y = Math.max(r + 10, Math.min(canvas.height - r - 10, a.y))
         })
-
-        a.vx *= 0.82
-        a.vy *= 0.82
-        a.x += a.vx
-        a.y += a.vy
-
-        const r = riskToRadius(a.risk_score)
-        a.x = Math.max(r + 10, Math.min(canvas.width - r - 10, a.x))
-        a.y = Math.max(r + 10, Math.min(canvas.height - r - 10, a.y))
-      })
+      }
 
       // Draw nodes
       const filteredSearch = search.toLowerCase()
@@ -229,7 +231,10 @@ export default function MarketMap({ competitors, isLiveData }: Props) {
         ctx.restore()
       })
 
-      animFrameRef.current = requestAnimationFrame(draw)
+      // Keep looping while physics is active; after settling, only redraw on interaction
+      if (tickRef.current < 260) {
+        animFrameRef.current = requestAnimationFrame(draw)
+      }
     }
 
     animFrameRef.current = requestAnimationFrame(draw)
