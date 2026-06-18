@@ -1,5 +1,44 @@
 # SignalMap — Sprint Status
 
+## Sprint 3 — COMPLETE ✅
+**Date:** 2026-06-18
+
+### Completed
+- [x] **Light theme** — removed dark mode, bg-gray-50 base, white cards, gray text throughout all pages and components
+- [x] **AI Onboarding** — poll-style competitor selection: describe product → Groq suggests 12 competitors → toggle-card grid → bulk add. "Suggest more" (appends new cards, excludes already shown) + "Add your own" inline form
+- [x] **Auth callback** — redirects to /onboarding if no org membership, else /map
+- [x] **Org creation RLS fix** — SECURITY DEFINER RPC `create_user_org` bypasses recursive org_members policy (42P17). Dropped self-referencing SELECT policy.
+- [x] **Middleware fix** — /api/ routes excluded from auth middleware matcher so cron can be called without session cookie
+- [x] **Market Map fixes** — themes spread by index (no more all-in-one-cluster), physics stops after 250 ticks, light canvas background
+- [x] **Historical tracking migration** — 3 new tables: `competitor_snapshots`, `competitor_diffs`, `risk_score_history` with RLS
+- [x] **Structured extraction** (`lib/extractor.ts`) — `extractPageData()` calls Groq to pull key_items from page content by type (pricing plans, headlines, job titles, changelog entries). `diffParsedPages()` compares key_items arrays. `calculateRiskScores()` scores product_velocity / messaging_overlap / market_reach from 30-day diff window
+- [x] **Cron v3** — extraction only runs on changed pages (not every page), 2s inter-page sleep to stay under Groq 12k TPM. Baseline extraction for pages with no prior structured snapshot
+- [x] **Activity Timeline** (`components/competitor/activity-timeline.tsx`) — groups competitor_diffs into This Week / This Month / This Quarter with colored change-type icons
+- [x] **Risk Sparkline** (`components/competitor/risk-sparkline.tsx`) — SVG polyline from risk_score_history with trend arrow
+- [x] **Competitor Profile rewrite** — 4-stat header, Activity Timeline + Risk Breakdown grid, per-metric sparklines, 30d total sparkline, Monitored Pages section, AI Signals feed
+- [x] **Groq rate limit fix** — structured extraction skipped for no_changes pages that already have a baseline; one-time baseline extraction on first encounter
+- [x] **All 12 competitors baselined** — 23 competitor_snapshots rows across 12 competitors (Desk.com/pricing excluded — permanent 403)
+
+### DB Migrations run
+- `supabase/migrations/20240101000000_initial_schema.sql` — original schema
+- `supabase/migrations/20240104000000_historical_tracking.sql` — competitor_snapshots, competitor_diffs, risk_score_history
+
+### Cron status
+- Runs daily at 8am UTC via `vercel.json`
+- Manual trigger: `curl -H "Authorization: Bearer <CRON_SECRET>" https://signalmap-sigma.vercel.app/api/cron`
+- First real diffs will appear tomorrow (compares today's baselines vs tomorrow's crawl)
+- Desk.com/pricing (`tracked_page id: 5f4a5da2`) is a permanent 403 — safe to delete from tracked_pages to save a cron slot
+
+### How the data pipeline works (v3)
+1. Cron crawls each tracked page (20/run, ordered by oldest last_crawled_at)
+2. Compares raw text against previous page_snapshot — if no changes, skip AI (0 tokens)
+3. If first snapshot: extract structured baseline via Groq → store in competitor_snapshots
+4. If no_changes but no baseline yet: extract baseline once, then skip forever
+5. If changes: extract → diff against yesterday's competitor_snapshot → store competitor_diff → AI summarize → store change record
+6. After all pages: calculate risk scores from 30-day diff window → upsert risk_score_history
+
+---
+
 ## Sprint 2 — COMPLETE ✅
 **Date:** 2026-06-18
 
@@ -21,25 +60,6 @@
 - [x] **TypeScript types fixed** — added `Relationships` arrays to all tables, `CompositeTypes` to schema. Zero type errors.
 - [x] Zero compile errors, dev server clean on port 3003
 
-### .env.local — keys needed before full pipeline works
-```
-NEXT_PUBLIC_SUPABASE_URL=https://smmcvglmwrddtyaebwnu.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=<Supabase dashboard → Project Settings → API>
-SUPABASE_SERVICE_ROLE_KEY=<Supabase dashboard → Project Settings → API>
-ANTHROPIC_API_KEY=<console.anthropic.com>
-CRON_SECRET=<any random string, e.g. openssl rand -hex 32>
-```
-
-### DB Migration — run this before testing
-Paste `supabase/migrations/20240101000000_initial_schema.sql` into the Supabase SQL editor.
-Then enable Google OAuth in Supabase Auth → Providers → Google.
-
-### How the data pipeline works
-1. User adds competitor + pages in `/settings`
-2. Cron hits `/api/cron` every 24h with `Authorization: Bearer <CRON_SECRET>`
-3. For each tracked page: crawl → snapshot → diff against previous → Claude analysis → store change
-4. Changes appear in `/changes` and competitor risk scores update on the Market Map
-
 ---
 
 ## Sprint 1 — COMPLETE ✅
@@ -59,15 +79,16 @@ Then enable Google OAuth in Supabase Auth → Providers → Google.
 
 ---
 
-## Sprint 3 — TODO
+## Sprint 4 — TODO
 
 ### Priority Order
 1. **Weekly Digest** (`/digest`) — generate AI briefing from the week's changes, send to Slack
 2. **Trend Timeline** — chart theme activity across competitors over time
 3. **Battle Room** — head-to-head comparison page
 4. **Realtime map updates** — Supabase Realtime subscription so map nodes pulse when new changes detected
-5. **Manual crawl trigger** — button in settings to trigger a crawl immediately (no waiting for cron)
+5. **Manual crawl trigger** — button in settings to trigger a crawl immediately
 6. **Slack webhook** — `/api/webhooks/slack` for digest delivery
+7. **Remove Desk.com/pricing** from tracked_pages (permanent 403, wastes cron slot)
 
 ---
 
@@ -76,14 +97,17 @@ Then enable Google OAuth in Supabase Auth → Providers → Google.
 ### Why Canvas API for Market Map?
 No D3.js or react-force-graph — a raw Canvas 2D API with spring physics gives full visual control, 60fps, zero dependencies.
 
-### Why shadcn v4 + Base UI?
-shadcn CLI now scaffolds with @base-ui/react. CSS normalized to hsl() for Tailwind v3 compatibility.
-
-### Why raw fetch for Anthropic?
-Per spec. All calls in lib/ai.ts — thin wrapper, strips fences, returns parsed JSON.
+### Why raw fetch for Groq?
+Per spec. All calls in lib/ai.ts — thin wrapper, strips fences, returns parsed JSON. Model: llama-3.3-70b-versatile.
 
 ### Crawler fallback strategy
-playwright-core is used when the binary is available (local dev). Falls back to fetch() for Vercel serverless where binary can't be bundled. For production Playwright support on Vercel, use @sparticuz/chromium-min.
+playwright-core is used when the binary is available (local dev). Falls back to fetch() for Vercel serverless where binary can't be bundled.
 
 ### Supabase TypeScript types
-Hand-written types with full Relationships arrays (matching supabase gen types format) to enable proper TypeScript inference for the Supabase JS client. Zero any casts in production code paths.
+Hand-written types with full Relationships arrays (matching supabase gen types format) to enable proper TypeScript inference. Zero any casts in production code paths.
+
+### Cron token budget (Groq free tier: 12k TPM)
+- no_changes pages with existing baseline: 0 tokens
+- first_snapshot or no_changes without baseline: ~800 tokens (extraction only)
+- change_detected: ~1,600 tokens (extraction + summarize)
+- 2s inter-page sleep spreads burst usage across the TPM window
