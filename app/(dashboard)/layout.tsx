@@ -9,7 +9,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
   if (!user) redirect('/login')
 
   return (
-    <div className="flex h-screen overflow-hidden bg-[#0a0a0f]">
+    <div className="flex h-screen overflow-hidden bg-gray-50">
       <DashboardNav user={user} />
       <main className="flex-1 overflow-hidden">
         {children}

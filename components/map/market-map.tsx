@@ -111,8 +111,11 @@ export default function MarketMap({ competitors, isLiveData }: Props) {
       tickRef.current++
       const progress = Math.min(tickRef.current / 60, 1)
 
-      ctx.clearRect(0, 0, canvas.width, canvas.height)
+      // Light background
+      ctx.fillStyle = '#f8fafc'
+      ctx.fillRect(0, 0, canvas.width, canvas.height)
 
+      // Cluster halos
       const themes = Object.keys(THEME_CONFIG) as Theme[]
       themes.forEach((theme) => {
         const cfg = THEME_CONFIG[theme]
@@ -124,7 +127,7 @@ export default function MarketMap({ competitors, isLiveData }: Props) {
         const maxDist = Math.max(...clusterNodes.map((n) => Math.hypot(n.x - cx, n.y - cy))) + 60
 
         const isActive = activeTheme === null || activeTheme === theme
-        const alpha = isActive ? 0.12 * progress : 0.04 * progress
+        const alpha = isActive ? 0.10 * progress : 0.03 * progress
 
         const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, maxDist)
         grad.addColorStop(0, cfg.color + Math.round(alpha * 255).toString(16).padStart(2, '0'))
@@ -136,7 +139,7 @@ export default function MarketMap({ competitors, isLiveData }: Props) {
 
         if (progress > 0.5) {
           ctx.save()
-          ctx.globalAlpha = Math.min((progress - 0.5) * 2, 1) * (isActive ? 0.7 : 0.3)
+          ctx.globalAlpha = Math.min((progress - 0.5) * 2, 1) * (isActive ? 0.6 : 0.2)
           ctx.font = '700 11px ui-sans-serif, system-ui, sans-serif'
           ctx.fillStyle = cfg.color
           ctx.textAlign = 'center'
@@ -145,6 +148,7 @@ export default function MarketMap({ competitors, isLiveData }: Props) {
         }
       })
 
+      // Physics
       const nodes = nodesRef.current
       nodes.forEach((a) => {
         const springK = 0.06
@@ -174,6 +178,7 @@ export default function MarketMap({ competitors, isLiveData }: Props) {
         a.y = Math.max(r + 10, Math.min(canvas.height - r - 10, a.y))
       })
 
+      // Draw nodes
       const filteredSearch = search.toLowerCase()
       nodes.forEach((node) => {
         const cfg = THEME_CONFIG[node.theme]
@@ -185,34 +190,38 @@ export default function MarketMap({ competitors, isLiveData }: Props) {
         const isActive = matchesSearch && matchesTheme
 
         ctx.save()
-        ctx.globalAlpha = isActive ? 1 : 0.25
+        ctx.globalAlpha = isActive ? 1 : 0.2
 
         if (isHovered || isSelected) {
           ctx.shadowColor = cfg.color
-          ctx.shadowBlur = 20
+          ctx.shadowBlur = 16
         }
 
+        // Node fill — solid color on light bg
         const grad = ctx.createRadialGradient(node.x - r * 0.3, node.y - r * 0.3, 0, node.x, node.y, r)
-        grad.addColorStop(0, cfg.color + 'cc')
-        grad.addColorStop(1, cfg.color + '55')
+        grad.addColorStop(0, cfg.color + 'ee')
+        grad.addColorStop(1, cfg.color + 'aa')
         ctx.beginPath()
         ctx.arc(node.x, node.y, r, 0, Math.PI * 2)
         ctx.fillStyle = grad
         ctx.fill()
 
-        ctx.strokeStyle = isHovered || isSelected ? cfg.color : cfg.color + '80'
-        ctx.lineWidth = isHovered || isSelected ? 2 : 1.5
+        // Border
+        ctx.strokeStyle = isHovered || isSelected ? cfg.color : cfg.color + 'cc'
+        ctx.lineWidth = isHovered || isSelected ? 2.5 : 1.5
         ctx.stroke()
         ctx.shadowBlur = 0
 
+        // Label — white text on colored node
         ctx.font = `${isHovered || isSelected ? '700' : '600'} ${r > 32 ? '11' : '10'}px ui-sans-serif, system-ui, sans-serif`
         ctx.fillStyle = '#ffffff'
         ctx.textAlign = 'center'
         ctx.textBaseline = 'middle'
         ctx.fillText(node.name, node.x, node.y)
 
+        // Risk score below
         if (r > 28 || isHovered) {
-          ctx.font = '500 9px ui-sans-serif, system-ui, sans-serif'
+          ctx.font = '600 9px ui-sans-serif, system-ui, sans-serif'
           ctx.fillStyle = cfg.color
           ctx.fillText(`${node.risk_score}`, node.x, node.y + r + 12)
         }
@@ -254,13 +263,13 @@ export default function MarketMap({ competitors, isLiveData }: Props) {
   }
 
   return (
-    <div className="flex flex-col h-full bg-[#0a0a0f]">
+    <div className="flex flex-col h-full bg-gray-50">
       {/* Toolbar */}
-      <div className="flex items-center gap-3 px-4 py-3 border-b border-zinc-800/60">
-        <h1 className="text-white font-semibold text-sm">Market Map</h1>
+      <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-200 bg-white">
+        <h1 className="text-gray-900 font-semibold text-sm">Market Map</h1>
 
         {!isLiveData && (
-          <span className="flex items-center gap-1.5 text-xs text-amber-400 bg-amber-400/10 px-2 py-0.5 rounded-full border border-amber-400/20">
+          <span className="flex items-center gap-1.5 text-xs text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
             <Database className="w-3 h-3" />
             Demo data — <Link href="/settings" className="underline underline-offset-2">add competitors</Link>
           </span>
@@ -269,13 +278,13 @@ export default function MarketMap({ competitors, isLiveData }: Props) {
         <div className="flex-1" />
 
         <div className="relative">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-500" />
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
           <input
             type="text"
             placeholder="Search competitors…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="bg-zinc-900 border border-zinc-800 rounded-lg pl-8 pr-3 py-1.5 text-xs text-white placeholder-zinc-600 focus:outline-none focus:ring-1 focus:ring-violet-500 w-44"
+            className="bg-white border border-gray-300 rounded-lg pl-8 pr-3 py-1.5 text-xs text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-violet-500 w-44"
           />
         </div>
 
@@ -288,7 +297,7 @@ export default function MarketMap({ competitors, isLiveData }: Props) {
               style={
                 activeTheme === t
                   ? { backgroundColor: THEME_CONFIG[t].bg, color: THEME_CONFIG[t].color, borderColor: THEME_CONFIG[t].color + '60' }
-                  : { backgroundColor: 'transparent', color: '#71717a', borderColor: '#27272a' }
+                  : { backgroundColor: 'transparent', color: '#6b7280', borderColor: '#e5e7eb' }
               }
             >
               <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: THEME_CONFIG[t].color }} />
@@ -300,7 +309,7 @@ export default function MarketMap({ competitors, isLiveData }: Props) {
         <button
           onClick={handleReset}
           title="Replay animation"
-          className="w-7 h-7 rounded-lg flex items-center justify-center text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800 transition-colors"
+          className="w-7 h-7 rounded-lg flex items-center justify-center text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors"
         >
           <RefreshCw className="w-3.5 h-3.5" />
         </button>
@@ -308,7 +317,7 @@ export default function MarketMap({ competitors, isLiveData }: Props) {
         <Link
           href="/settings"
           title="Add competitors"
-          className="w-7 h-7 rounded-lg flex items-center justify-center text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800 transition-colors"
+          className="w-7 h-7 rounded-lg flex items-center justify-center text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors"
         >
           <Settings className="w-3.5 h-3.5" />
         </Link>
@@ -324,23 +333,23 @@ export default function MarketMap({ competitors, isLiveData }: Props) {
           className="absolute inset-0"
         />
 
-        <div className="absolute bottom-4 left-4 bg-zinc-950/80 border border-zinc-800 rounded-xl p-3 backdrop-blur-sm">
-          <p className="text-zinc-600 text-xs mb-2 font-medium uppercase tracking-wide">Node size = risk score</p>
+        <div className="absolute bottom-4 left-4 bg-white border border-gray-200 rounded-xl p-3 shadow-sm">
+          <p className="text-gray-400 text-xs mb-2 font-medium uppercase tracking-wide">Node size = risk score</p>
           <div className="flex items-end gap-2">
             {[30, 50, 75].map((score) => (
               <div key={score} className="flex flex-col items-center gap-1">
                 <div
-                  className="rounded-full bg-zinc-700"
+                  className="rounded-full bg-gray-300"
                   style={{ width: riskToRadius(score) * 1.4, height: riskToRadius(score) * 1.4 }}
                 />
-                <span className="text-zinc-500 text-xs">{score}</span>
+                <span className="text-gray-400 text-xs">{score}</span>
               </div>
             ))}
           </div>
         </div>
 
-        <div className="absolute bottom-4 right-4 bg-zinc-950/80 border border-zinc-800 rounded-xl px-3 py-2 backdrop-blur-sm">
-          <span className="text-zinc-500 text-xs">{competitors.length} competitors tracked</span>
+        <div className="absolute bottom-4 right-4 bg-white border border-gray-200 rounded-xl px-3 py-2 shadow-sm">
+          <span className="text-gray-500 text-xs">{competitors.length} competitors tracked</span>
         </div>
       </div>
 

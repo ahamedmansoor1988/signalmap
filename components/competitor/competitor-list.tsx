@@ -17,9 +17,9 @@ interface Props {
 function RiskBadge({ score }: { score: number }) {
   const level = score >= 75 ? 'High' : score >= 50 ? 'Medium' : 'Low'
   const cls = {
-    High: 'bg-red-500/10 text-red-400',
-    Medium: 'bg-amber-500/10 text-amber-400',
-    Low: 'bg-emerald-500/10 text-emerald-400',
+    High: 'bg-red-50 text-red-600',
+    Medium: 'bg-amber-50 text-amber-600',
+    Low: 'bg-emerald-50 text-emerald-600',
   }
   return (
     <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${cls[level]}`}>
@@ -43,10 +43,10 @@ export default function CompetitorList({ competitors }: Props) {
 
   if (!competitors.length) {
     return (
-      <div className="text-center py-12 border border-dashed border-zinc-800 rounded-xl">
-        <Globe className="w-8 h-8 text-zinc-700 mx-auto mb-3" />
-        <p className="text-zinc-500 text-sm">No competitors added yet</p>
-        <p className="text-zinc-600 text-xs mt-1">Add your first competitor above</p>
+      <div className="text-center py-12 border border-dashed border-gray-300 rounded-xl">
+        <Globe className="w-8 h-8 text-gray-300 mx-auto mb-3" />
+        <p className="text-gray-500 text-sm">No competitors added yet</p>
+        <p className="text-gray-400 text-xs mt-1">Add your first competitor above</p>
       </div>
     )
   }
@@ -56,18 +56,18 @@ export default function CompetitorList({ competitors }: Props) {
       {competitors.map((c) => (
         <div
           key={c.id}
-          className="bg-zinc-900/60 border border-zinc-800 rounded-xl p-4 flex items-start justify-between group"
+          className="bg-white border border-gray-200 rounded-xl p-4 flex items-start justify-between group shadow-sm"
         >
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1">
-              <span className="text-white font-medium text-sm">{c.name}</span>
+              <span className="text-gray-900 font-medium text-sm">{c.name}</span>
               <RiskBadge score={c.risk_score} />
             </div>
             <a
               href={c.website}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center gap-1 text-zinc-500 text-xs hover:text-zinc-300 transition-colors w-fit"
+              className="flex items-center gap-1 text-gray-400 text-xs hover:text-gray-600 transition-colors w-fit"
             >
               {c.website.replace(/^https?:\/\//, '')}
               <ExternalLink className="w-3 h-3" />
@@ -77,7 +77,7 @@ export default function CompetitorList({ competitors }: Props) {
                 {c.tracked_pages.map((p) => (
                   <span
                     key={p.id}
-                    className="text-xs bg-zinc-800 text-zinc-500 px-2 py-0.5 rounded-full"
+                    className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full"
                   >
                     {p.label ?? (new URL(p.url).pathname || '/')}
                   </span>
@@ -88,7 +88,7 @@ export default function CompetitorList({ competitors }: Props) {
           <button
             onClick={() => handleDelete(c.id)}
             disabled={deleting === c.id}
-            className="ml-3 w-7 h-7 rounded-lg flex items-center justify-center text-zinc-700 hover:text-red-400 hover:bg-red-400/10 transition-colors opacity-0 group-hover:opacity-100"
+            className="ml-3 w-7 h-7 rounded-lg flex items-center justify-center text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors opacity-0 group-hover:opacity-100"
           >
             <Trash2 className="w-3.5 h-3.5" />
           </button>

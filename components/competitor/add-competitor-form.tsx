@@ -74,36 +74,36 @@ export default function AddCompetitorForm({ orgId, onSuccess }: Props) {
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className="text-zinc-400 text-xs font-medium block mb-1.5">Competitor name</label>
+          <label className="text-gray-600 text-xs font-medium block mb-1.5">Competitor name</label>
           <div className="relative">
-            <Globe className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-500" />
+            <Globe className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
             <input
               required
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="Crayon"
-              className="w-full bg-zinc-900 border border-zinc-800 rounded-lg pl-8 pr-3 py-2 text-white text-sm placeholder-zinc-600 focus:outline-none focus:ring-1 focus:ring-violet-500"
+              className="w-full bg-white border border-gray-300 rounded-lg pl-8 pr-3 py-2 text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-violet-500"
             />
           </div>
         </div>
         <div>
-          <label className="text-zinc-400 text-xs font-medium block mb-1.5">Website</label>
+          <label className="text-gray-600 text-xs font-medium block mb-1.5">Website</label>
           <div className="relative">
-            <Link className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-500" />
+            <Link className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
             <input
               required
               value={website}
               onChange={(e) => setWebsite(e.target.value)}
               placeholder="https://crayon.co"
               type="url"
-              className="w-full bg-zinc-900 border border-zinc-800 rounded-lg pl-8 pr-3 py-2 text-white text-sm placeholder-zinc-600 focus:outline-none focus:ring-1 focus:ring-violet-500"
+              className="w-full bg-white border border-gray-300 rounded-lg pl-8 pr-3 py-2 text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-violet-500"
             />
           </div>
         </div>
       </div>
 
       <div>
-        <label className="text-zinc-400 text-xs font-medium block mb-1.5">Pages to monitor</label>
+        <label className="text-gray-600 text-xs font-medium block mb-1.5">Pages to monitor</label>
         <div className="space-y-2">
           {urls.map((url, i) => (
             <div key={i} className="flex gap-2">
@@ -112,13 +112,13 @@ export default function AddCompetitorForm({ orgId, onSuccess }: Props) {
                 onChange={(e) => updateUrl(i, e.target.value)}
                 placeholder="https://crayon.co/pricing"
                 type="url"
-                className="flex-1 bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-white text-sm placeholder-zinc-600 focus:outline-none focus:ring-1 focus:ring-violet-500"
+                className="flex-1 bg-white border border-gray-300 rounded-lg px-3 py-2 text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-violet-500"
               />
               {urls.length > 1 && (
                 <button
                   type="button"
                   onClick={() => removeUrl(i)}
-                  className="w-8 h-8 my-auto rounded-lg flex items-center justify-center text-zinc-600 hover:text-zinc-300 hover:bg-zinc-800 transition-colors"
+                  className="w-8 h-8 my-auto rounded-lg flex items-center justify-center text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors"
                 >
                   <X className="w-3.5 h-3.5" />
                 </button>
@@ -129,14 +129,14 @@ export default function AddCompetitorForm({ orgId, onSuccess }: Props) {
         <button
           type="button"
           onClick={addUrl}
-          className="mt-2 flex items-center gap-1.5 text-xs text-violet-400 hover:text-violet-300 transition-colors"
+          className="mt-2 flex items-center gap-1.5 text-xs text-violet-600 hover:text-violet-700 transition-colors"
         >
           <Plus className="w-3.5 h-3.5" />
           Add another page
         </button>
       </div>
 
-      {error && <p className="text-red-400 text-xs">{error}</p>}
+      {error && <p className="text-red-600 text-xs">{error}</p>}
 
       <Button
         type="submit"

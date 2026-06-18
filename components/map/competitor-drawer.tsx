@@ -15,9 +15,9 @@ interface CompetitorDrawerProps {
 function RiskBadge({ score }: { score: number }) {
   const level = score >= 75 ? 'High' : score >= 50 ? 'Medium' : 'Low'
   const colors = {
-    High: 'bg-red-500/10 text-red-400 border-red-500/20',
-    Medium: 'bg-amber-500/10 text-amber-400 border-amber-500/20',
-    Low: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
+    High: 'bg-red-50 text-red-600 border-red-200',
+    Medium: 'bg-amber-50 text-amber-600 border-amber-200',
+    Low: 'bg-emerald-50 text-emerald-600 border-emerald-200',
   }
   return (
     <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full border font-medium ${colors[level]}`}>
@@ -36,18 +36,18 @@ export default function CompetitorDrawer({ competitor, open, onClose }: Competit
     <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
       <SheetContent
         side="right"
-        className="w-[400px] bg-zinc-950 border-l border-zinc-800 p-0 overflow-y-auto"
+        className="w-[400px] bg-white border-l border-gray-200 p-0 overflow-y-auto"
       >
         {/* Header */}
         <div className="p-6 pb-4">
           <div className="flex items-start justify-between mb-4">
             <div>
-              <h2 className="text-white text-xl font-semibold">{competitor.name}</h2>
+              <h2 className="text-gray-900 text-xl font-semibold">{competitor.name}</h2>
               <a
                 href={`https://${competitor.website}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-zinc-500 text-sm hover:text-zinc-300 flex items-center gap-1 mt-0.5 transition-colors"
+                className="text-gray-400 text-sm hover:text-gray-600 flex items-center gap-1 mt-0.5 transition-colors"
               >
                 {competitor.website}
                 <ExternalLink className="w-3 h-3" />
@@ -63,41 +63,41 @@ export default function CompetitorDrawer({ competitor, open, onClose }: Competit
             >
               {competitor.theme}
             </span>
-            <span className="text-zinc-600 text-xs">·</span>
-            <span className="text-zinc-500 text-xs">{competitor.signals_count} signals this month</span>
+            <span className="text-gray-300 text-xs">·</span>
+            <span className="text-gray-400 text-xs">{competitor.signals_count} signals this month</span>
           </div>
         </div>
 
-        <Separator className="bg-zinc-800" />
+        <Separator className="bg-gray-200" />
 
         {/* Latest Signal */}
         <div className="p-6">
           <div className="flex items-center gap-2 mb-3">
-            <Zap className="w-4 h-4 text-amber-400" />
-            <span className="text-zinc-300 text-sm font-medium">Latest Signal</span>
+            <Zap className="w-4 h-4 text-amber-500" />
+            <span className="text-gray-700 text-sm font-medium">Latest Signal</span>
           </div>
-          <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
-            <p className="text-white text-sm leading-relaxed">{competitor.last_signal}</p>
-            <p className="text-zinc-500 text-xs mt-2">Detected 2 hours ago</p>
+          <div className="bg-gray-50 border border-gray-200 rounded-xl p-4">
+            <p className="text-gray-900 text-sm leading-relaxed">{competitor.last_signal}</p>
+            <p className="text-gray-400 text-xs mt-2">Detected 2 hours ago</p>
           </div>
         </div>
 
-        <Separator className="bg-zinc-800" />
+        <Separator className="bg-gray-200" />
 
         {/* Strategic Summary */}
         <div className="p-6">
           <div className="flex items-center gap-2 mb-3">
-            <TrendingUp className="w-4 h-4 text-violet-400" />
-            <span className="text-zinc-300 text-sm font-medium">Strategic Summary</span>
+            <TrendingUp className="w-4 h-4 text-violet-500" />
+            <span className="text-gray-700 text-sm font-medium">Strategic Summary</span>
           </div>
-          <p className="text-zinc-400 text-sm leading-relaxed">{competitor.description}</p>
+          <p className="text-gray-500 text-sm leading-relaxed">{competitor.description}</p>
         </div>
 
-        <Separator className="bg-zinc-800" />
+        <Separator className="bg-gray-200" />
 
         {/* Risk Score Breakdown */}
         <div className="p-6">
-          <span className="text-zinc-300 text-sm font-medium block mb-3">Risk Score Breakdown</span>
+          <span className="text-gray-700 text-sm font-medium block mb-3">Risk Score Breakdown</span>
           <div className="space-y-2">
             {[
               { label: 'Product velocity', value: Math.round(competitor.risk_score * 0.35) },
@@ -105,24 +105,24 @@ export default function CompetitorDrawer({ competitor, open, onClose }: Competit
               { label: 'Market reach', value: Math.round(competitor.risk_score * 0.35) },
             ].map(({ label, value }) => (
               <div key={label} className="flex items-center gap-3">
-                <span className="text-zinc-500 text-xs w-32 shrink-0">{label}</span>
-                <div className="flex-1 h-1.5 bg-zinc-800 rounded-full overflow-hidden">
+                <span className="text-gray-400 text-xs w-32 shrink-0">{label}</span>
+                <div className="flex-1 h-1.5 bg-gray-200 rounded-full overflow-hidden">
                   <div
                     className="h-full rounded-full transition-all duration-700"
                     style={{ width: `${value}%`, backgroundColor: theme.color }}
                   />
                 </div>
-                <span className="text-zinc-400 text-xs w-6 text-right">{value}</span>
+                <span className="text-gray-500 text-xs w-6 text-right">{value}</span>
               </div>
             ))}
           </div>
         </div>
 
-        <Separator className="bg-zinc-800" />
+        <Separator className="bg-gray-200" />
 
         {/* Suggested Actions */}
         <div className="p-6">
-          <span className="text-zinc-300 text-sm font-medium block mb-3">Suggested Actions</span>
+          <span className="text-gray-700 text-sm font-medium block mb-3">Suggested Actions</span>
           <div className="space-y-2">
             {[
               'Update battlecard with latest positioning changes',
@@ -130,8 +130,8 @@ export default function CompetitorDrawer({ competitor, open, onClose }: Competit
               'Flag to sales team for upcoming deals',
             ].map((action, i) => (
               <div key={i} className="flex items-start gap-2">
-                <span className="text-violet-400 mt-0.5">›</span>
-                <span className="text-zinc-400 text-sm">{action}</span>
+                <span className="text-violet-500 mt-0.5">›</span>
+                <span className="text-gray-500 text-sm">{action}</span>
               </div>
             ))}
           </div>

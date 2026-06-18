@@ -18,7 +18,7 @@ export default function DashboardNav({ user }: { user: User }) {
   const pathname = usePathname()
 
   return (
-    <nav className="flex flex-col w-14 border-r border-zinc-800/60 bg-zinc-950/80 items-center py-4 gap-1">
+    <nav className="flex flex-col w-14 border-r border-gray-200 bg-white items-center py-4 gap-1">
       <Link href="/map" className="mb-4">
         <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center">
           <span className="text-white text-xs font-bold">SM</span>
@@ -33,8 +33,8 @@ export default function DashboardNav({ user }: { user: User }) {
           className={cn(
             'w-9 h-9 rounded-lg flex items-center justify-center transition-colors',
             pathname === href || pathname.startsWith(href + '/')
-              ? 'bg-violet-600/20 text-violet-400'
-              : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800'
+              ? 'bg-violet-50 text-violet-600'
+              : 'text-gray-400 hover:text-gray-700 hover:bg-gray-100'
           )}
         >
           <Icon className="w-4 h-4" />

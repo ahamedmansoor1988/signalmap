@@ -23,24 +23,24 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0a0a0f] flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
       <div className="w-full max-w-sm">
         <div className="mb-8 text-center">
           <div className="inline-flex items-center gap-2 mb-4">
             <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center">
               <span className="text-white text-xs font-bold">SM</span>
             </div>
-            <span className="text-white text-xl font-semibold tracking-tight">SignalMap</span>
+            <span className="text-gray-900 text-xl font-semibold tracking-tight">SignalMap</span>
           </div>
-          <p className="text-zinc-400 text-sm">Your competitive intelligence canvas</p>
+          <p className="text-gray-500 text-sm">Your competitive intelligence canvas</p>
         </div>
 
-        <div className="bg-zinc-900/60 border border-zinc-800 rounded-2xl p-6">
+        <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">
           <Button
             onClick={handleGoogle}
             disabled={loading}
             variant="outline"
-            className="w-full bg-zinc-800 border-zinc-700 text-white hover:bg-zinc-700 h-11"
+            className="w-full border-gray-300 text-gray-700 hover:bg-gray-50 h-11"
           >
             <svg className="w-4 h-4 mr-2 shrink-0" viewBox="0 0 24 24">
               <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
@@ -52,11 +52,11 @@ export default function LoginPage() {
           </Button>
 
           {error && (
-            <p className="text-red-400 text-xs text-center mt-3">{error}</p>
+            <p className="text-red-500 text-xs text-center mt-3">{error}</p>
           )}
         </div>
 
-        <p className="text-zinc-600 text-xs text-center mt-4">
+        <p className="text-gray-400 text-xs text-center mt-4">
           Competitive intelligence for PMM teams
         </p>
       </div>

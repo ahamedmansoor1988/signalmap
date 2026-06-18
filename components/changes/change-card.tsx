@@ -28,17 +28,17 @@ export default function ChangeCard({ change }: { change: Change }) {
   const theme = change.theme as Theme | null
   const cfg = theme && THEME_CONFIG[theme] ? THEME_CONFIG[theme] : null
   const riskLevel = (change.risk_score ?? 0) >= 75 ? 'High' : (change.risk_score ?? 0) >= 50 ? 'Medium' : 'Low'
-  const riskColors = { High: 'text-red-400', Medium: 'text-amber-400', Low: 'text-emerald-400' }
+  const riskColors = { High: 'text-red-600', Medium: 'text-amber-600', Low: 'text-emerald-600' }
 
   return (
     <Link
       href={`/changes/${change.id}`}
-      className="block bg-zinc-900/60 border border-zinc-800 rounded-xl p-4 hover:border-zinc-700 hover:bg-zinc-900 transition-all group"
+      className="block bg-white border border-gray-200 rounded-xl p-4 hover:border-gray-300 hover:shadow-sm transition-all group"
     >
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-2">
-            <span className="text-white font-medium text-sm">
+            <span className="text-gray-900 font-medium text-sm">
               {change.tracked_pages.competitors.name}
             </span>
             {cfg && (
@@ -55,27 +55,27 @@ export default function ChangeCard({ change }: { change: Change }) {
           </div>
 
           {change.ai_signal && (
-            <p className="text-zinc-200 text-sm font-medium mb-1.5 leading-snug">
+            <p className="text-gray-800 text-sm font-medium mb-1.5 leading-snug">
               {change.ai_signal}
             </p>
           )}
 
           {change.ai_summary && (
-            <p className="text-zinc-500 text-xs leading-relaxed line-clamp-2">
+            <p className="text-gray-400 text-xs leading-relaxed line-clamp-2">
               {change.ai_summary}
             </p>
           )}
 
           <div className="flex items-center gap-3 mt-3">
-            <span className="flex items-center gap-1 text-zinc-600 text-xs">
+            <span className="flex items-center gap-1 text-gray-400 text-xs">
               <Clock className="w-3 h-3" />
               {timeAgo(change.detected_at)}
             </span>
-            <span className="text-zinc-700 text-xs">
+            <span className="text-gray-300 text-xs">
               {change.tracked_pages.label ?? (new URL(change.tracked_pages.url).pathname || '/')}
             </span>
             {change.confidence != null && (
-              <span className="flex items-center gap-1 text-zinc-600 text-xs">
+              <span className="flex items-center gap-1 text-gray-400 text-xs">
                 <TrendingUp className="w-3 h-3" />
                 {change.confidence}% confidence
               </span>
@@ -86,7 +86,7 @@ export default function ChangeCard({ change }: { change: Change }) {
         <div className="flex flex-col items-end gap-1.5 shrink-0">
           <div
             className="w-10 h-10 rounded-lg flex items-center justify-center font-bold text-sm"
-            style={cfg ? { backgroundColor: cfg.bg, color: cfg.color } : { backgroundColor: '#27272a', color: '#71717a' }}
+            style={cfg ? { backgroundColor: cfg.bg, color: cfg.color } : { backgroundColor: '#f3f4f6', color: '#9ca3af' }}
           >
             {change.risk_score ?? 0}
           </div>

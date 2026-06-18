@@ -46,14 +46,18 @@ export default async function CompetitorProfilePage({ params }: { params: { id: 
     .sort((a, b) => new Date(b.detected_at).getTime() - new Date(a.detected_at).getTime())
 
   const riskLevel = competitor.risk_score >= 75 ? 'High' : competitor.risk_score >= 50 ? 'Medium' : 'Low'
-  const riskColors = { High: 'text-red-400 bg-red-400/10', Medium: 'text-amber-400 bg-amber-400/10', Low: 'text-emerald-400 bg-emerald-400/10' }
+  const riskColors = {
+    High: 'text-red-600 bg-red-50',
+    Medium: 'text-amber-600 bg-amber-50',
+    Low: 'text-emerald-600 bg-emerald-50',
+  }
 
   return (
     <div className="h-full overflow-y-auto">
       <div className="max-w-3xl mx-auto px-6 py-8">
         <Link
           href="/competitor"
-          className="flex items-center gap-1.5 text-zinc-500 text-sm hover:text-zinc-300 transition-colors mb-6"
+          className="flex items-center gap-1.5 text-gray-400 text-sm hover:text-gray-700 transition-colors mb-6"
         >
           <ArrowLeft className="w-3.5 h-3.5" />
           Competitors
@@ -62,12 +66,12 @@ export default async function CompetitorProfilePage({ params }: { params: { id: 
         {/* Header */}
         <div className="flex items-start justify-between mb-8">
           <div>
-            <h1 className="text-white text-2xl font-semibold">{competitor.name}</h1>
+            <h1 className="text-gray-900 text-2xl font-semibold">{competitor.name}</h1>
             <a
               href={competitor.website}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center gap-1 text-zinc-500 text-sm hover:text-zinc-300 transition-colors mt-1"
+              className="flex items-center gap-1 text-gray-400 text-sm hover:text-gray-600 transition-colors mt-1"
             >
               {competitor.website.replace(/^https?:\/\//, '')}
               <ExternalLink className="w-3.5 h-3.5" />
@@ -85,24 +89,24 @@ export default async function CompetitorProfilePage({ params }: { params: { id: 
             { label: 'Total Changes', value: allChanges.length },
             { label: 'Risk Score', value: competitor.risk_score },
           ].map(({ label, value }) => (
-            <div key={label} className="bg-zinc-900/60 border border-zinc-800 rounded-xl p-4 text-center">
-              <div className="text-white text-2xl font-bold">{value}</div>
-              <div className="text-zinc-500 text-xs mt-0.5">{label}</div>
+            <div key={label} className="bg-white border border-gray-200 rounded-xl p-4 text-center shadow-sm">
+              <div className="text-gray-900 text-2xl font-bold">{value}</div>
+              <div className="text-gray-400 text-xs mt-0.5">{label}</div>
             </div>
           ))}
         </div>
 
         {/* Tracked Pages */}
         <section className="mb-8">
-          <h2 className="text-white text-sm font-semibold mb-3">Monitored Pages</h2>
+          <h2 className="text-gray-900 text-sm font-semibold mb-3">Monitored Pages</h2>
           <div className="space-y-2">
             {pages.map((p) => (
-              <div key={p.id} className="bg-zinc-900/60 border border-zinc-800 rounded-xl p-3 flex items-center justify-between">
+              <div key={p.id} className="bg-white border border-gray-200 rounded-xl p-3 flex items-center justify-between shadow-sm">
                 <div>
-                  <p className="text-zinc-300 text-sm">{p.label ?? p.url}</p>
-                  <p className="text-zinc-600 text-xs mt-0.5">{p.url}</p>
+                  <p className="text-gray-700 text-sm">{p.label ?? p.url}</p>
+                  <p className="text-gray-400 text-xs mt-0.5">{p.url}</p>
                 </div>
-                <div className="flex items-center gap-1.5 text-zinc-600 text-xs">
+                <div className="flex items-center gap-1.5 text-gray-400 text-xs">
                   <Clock className="w-3 h-3" />
                   {p.last_crawled_at
                     ? new Date(p.last_crawled_at).toLocaleDateString()
@@ -115,10 +119,10 @@ export default async function CompetitorProfilePage({ params }: { params: { id: 
 
         {/* Activity Feed */}
         <section>
-          <h2 className="text-white text-sm font-semibold mb-3">Activity Feed</h2>
+          <h2 className="text-gray-900 text-sm font-semibold mb-3">Activity Feed</h2>
           {allChanges.length === 0 ? (
-            <div className="text-center py-10 border border-dashed border-zinc-800 rounded-xl">
-              <p className="text-zinc-500 text-sm">No changes detected yet</p>
+            <div className="text-center py-10 border border-dashed border-gray-300 rounded-xl">
+              <p className="text-gray-500 text-sm">No changes detected yet</p>
             </div>
           ) : (
             <div className="space-y-3">
@@ -129,7 +133,7 @@ export default async function CompetitorProfilePage({ params }: { params: { id: 
                   <Link
                     key={change.id}
                     href={`/changes/${change.id}`}
-                    className="block bg-zinc-900/60 border border-zinc-800 rounded-xl p-4 hover:border-zinc-700 transition-colors"
+                    className="block bg-white border border-gray-200 rounded-xl p-4 hover:border-gray-300 hover:shadow-sm transition-all"
                   >
                     <div className="flex items-center gap-2 mb-1.5">
                       {cfg && (
@@ -140,19 +144,19 @@ export default async function CompetitorProfilePage({ params }: { params: { id: 
                           {theme}
                         </span>
                       )}
-                      <span className="text-zinc-600 text-xs ml-auto flex items-center gap-1">
+                      <span className="text-gray-400 text-xs ml-auto flex items-center gap-1">
                         <TrendingUp className="w-3 h-3" />
                         Risk {change.risk_score ?? 0}
                       </span>
-                      <span className="text-zinc-700 text-xs">
+                      <span className="text-gray-300 text-xs">
                         {new Date(change.detected_at).toLocaleDateString()}
                       </span>
                     </div>
                     {change.ai_signal && (
-                      <p className="text-zinc-200 text-sm font-medium">{change.ai_signal}</p>
+                      <p className="text-gray-800 text-sm font-medium">{change.ai_signal}</p>
                     )}
                     {change.ai_summary && (
-                      <p className="text-zinc-500 text-xs mt-1 line-clamp-2">{change.ai_summary}</p>
+                      <p className="text-gray-400 text-xs mt-1 line-clamp-2">{change.ai_summary}</p>
                     )}
                   </Link>
                 )

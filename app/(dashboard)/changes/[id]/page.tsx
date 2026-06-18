@@ -33,7 +33,7 @@ export default async function ChangeDetailPage({ params }: { params: { id: strin
         {/* Back */}
         <Link
           href="/changes"
-          className="flex items-center gap-1.5 text-zinc-500 text-sm hover:text-zinc-300 transition-colors mb-6"
+          className="flex items-center gap-1.5 text-gray-400 text-sm hover:text-gray-700 transition-colors mb-6"
         >
           <ArrowLeft className="w-3.5 h-3.5" />
           Change Explorer
@@ -42,7 +42,7 @@ export default async function ChangeDetailPage({ params }: { params: { id: strin
         {/* Header */}
         <div className="mb-6">
           <div className="flex items-center gap-2 mb-2">
-            <h1 className="text-white text-xl font-semibold">{competitor?.name}</h1>
+            <h1 className="text-gray-900 text-xl font-semibold">{competitor?.name}</h1>
             {cfg && (
               <span
                 className="text-xs px-2 py-0.5 rounded-full font-medium"
@@ -52,12 +52,12 @@ export default async function ChangeDetailPage({ params }: { params: { id: strin
               </span>
             )}
           </div>
-          <div className="flex items-center gap-3 text-zinc-500 text-xs">
+          <div className="flex items-center gap-3 text-gray-400 text-xs">
             <a
               href={competitor?.website}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center gap-1 hover:text-zinc-300 transition-colors"
+              className="flex items-center gap-1 hover:text-gray-600 transition-colors"
             >
               {competitor?.website?.replace(/^https?:\/\//, '')}
               <ExternalLink className="w-3 h-3" />
@@ -72,41 +72,41 @@ export default async function ChangeDetailPage({ params }: { params: { id: strin
         <div className="space-y-4">
           {/* Signal */}
           {change.ai_signal && (
-            <div className="bg-zinc-900/60 border border-zinc-800 rounded-xl p-4">
+            <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
               <div className="flex items-center gap-2 mb-2">
-                <Zap className="w-4 h-4 text-amber-400" />
-                <span className="text-zinc-300 text-sm font-medium">Signal</span>
+                <Zap className="w-4 h-4 text-amber-500" />
+                <span className="text-gray-700 text-sm font-medium">Signal</span>
                 {change.confidence != null && (
-                  <span className="ml-auto text-zinc-600 text-xs">{change.confidence}% confidence</span>
+                  <span className="ml-auto text-gray-400 text-xs">{change.confidence}% confidence</span>
                 )}
               </div>
-              <p className="text-white font-medium">{change.ai_signal}</p>
+              <p className="text-gray-900 font-medium">{change.ai_signal}</p>
             </div>
           )}
 
           {/* AI Summary */}
           {change.ai_summary && (
-            <div className="bg-zinc-900/60 border border-zinc-800 rounded-xl p-4">
+            <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
               <div className="flex items-center gap-2 mb-2">
-                <TrendingUp className="w-4 h-4 text-violet-400" />
-                <span className="text-zinc-300 text-sm font-medium">What it means</span>
+                <TrendingUp className="w-4 h-4 text-violet-500" />
+                <span className="text-gray-700 text-sm font-medium">What it means</span>
               </div>
-              <p className="text-zinc-300 text-sm leading-relaxed">{change.ai_summary}</p>
+              <p className="text-gray-600 text-sm leading-relaxed">{change.ai_summary}</p>
             </div>
           )}
 
           {/* Impact + Actions */}
           <div className="grid grid-cols-2 gap-4">
             {impactBullets && impactBullets.length > 0 && (
-              <div className="bg-zinc-900/60 border border-zinc-800 rounded-xl p-4">
+              <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
                 <div className="flex items-center gap-2 mb-3">
-                  <AlertCircle className="w-4 h-4 text-red-400" />
-                  <span className="text-zinc-300 text-sm font-medium">Impact</span>
+                  <AlertCircle className="w-4 h-4 text-red-500" />
+                  <span className="text-gray-700 text-sm font-medium">Impact</span>
                 </div>
                 <ul className="space-y-1.5">
                   {impactBullets.map((b, i) => (
-                    <li key={i} className="flex items-start gap-2 text-zinc-400 text-xs">
-                      <span className="text-red-400 mt-0.5">·</span>
+                    <li key={i} className="flex items-start gap-2 text-gray-500 text-xs">
+                      <span className="text-red-500 mt-0.5">·</span>
                       {b}
                     </li>
                   ))}
@@ -114,15 +114,15 @@ export default async function ChangeDetailPage({ params }: { params: { id: strin
               </div>
             )}
             {suggestedActions && suggestedActions.length > 0 && (
-              <div className="bg-zinc-900/60 border border-zinc-800 rounded-xl p-4">
+              <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
                 <div className="flex items-center gap-2 mb-3">
-                  <span className="text-violet-400 text-sm">→</span>
-                  <span className="text-zinc-300 text-sm font-medium">Actions</span>
+                  <span className="text-violet-500 text-sm">→</span>
+                  <span className="text-gray-700 text-sm font-medium">Actions</span>
                 </div>
                 <ul className="space-y-1.5">
                   {suggestedActions.map((a, i) => (
-                    <li key={i} className="flex items-start gap-2 text-zinc-400 text-xs">
-                      <span className="text-violet-400 mt-0.5">›</span>
+                    <li key={i} className="flex items-start gap-2 text-gray-500 text-xs">
+                      <span className="text-violet-500 mt-0.5">›</span>
                       {a}
                     </li>
                   ))}
@@ -133,22 +133,22 @@ export default async function ChangeDetailPage({ params }: { params: { id: strin
 
           {/* Risk Score */}
           {change.risk_score != null && (
-            <div className="bg-zinc-900/60 border border-zinc-800 rounded-xl p-4">
+            <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
               <div className="flex items-center justify-between mb-3">
-                <span className="text-zinc-300 text-sm font-medium">Risk Score</span>
+                <span className="text-gray-700 text-sm font-medium">Risk Score</span>
                 <span
                   className="text-2xl font-bold"
-                  style={{ color: cfg?.color ?? '#71717a' }}
+                  style={{ color: cfg?.color ?? '#9ca3af' }}
                 >
                   {change.risk_score}
                 </span>
               </div>
-              <div className="w-full h-2 bg-zinc-800 rounded-full overflow-hidden">
+              <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
                 <div
                   className="h-full rounded-full transition-all"
                   style={{
                     width: `${change.risk_score}%`,
-                    backgroundColor: cfg?.color ?? '#71717a',
+                    backgroundColor: cfg?.color ?? '#9ca3af',
                   }}
                 />
               </div>
@@ -157,13 +157,13 @@ export default async function ChangeDetailPage({ params }: { params: { id: strin
 
           {/* Diff View */}
           {change.diff_html && (
-            <div className="bg-zinc-900/60 border border-zinc-800 rounded-xl overflow-hidden">
-              <div className="px-4 py-3 border-b border-zinc-800">
-                <span className="text-zinc-300 text-sm font-medium">Page Diff</span>
+            <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
+              <div className="px-4 py-3 border-b border-gray-200 bg-gray-50">
+                <span className="text-gray-700 text-sm font-medium">Page Diff</span>
               </div>
               <div className="p-4 overflow-x-auto">
                 <pre
-                  className="text-xs font-mono leading-relaxed [&_.diff-add]:text-emerald-400 [&_.diff-add]:bg-emerald-400/10 [&_.diff-remove]:text-red-400 [&_.diff-remove]:bg-red-400/10 [&_.diff-context]:text-zinc-600"
+                  className="text-xs font-mono leading-relaxed [&_.diff-add]:text-emerald-700 [&_.diff-add]:bg-emerald-50 [&_.diff-remove]:text-red-700 [&_.diff-remove]:bg-red-50 [&_.diff-context]:text-gray-400"
                   dangerouslySetInnerHTML={{ __html: change.diff_html }}
                 />
               </div>

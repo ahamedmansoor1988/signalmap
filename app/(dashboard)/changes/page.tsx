@@ -19,7 +19,7 @@ export default async function ChangesPage() {
   if (!membership) {
     return (
       <div className="p-8">
-        <p className="text-zinc-500 text-sm">Set up your organization in Settings first.</p>
+        <p className="text-gray-500 text-sm">Set up your organization in Settings first.</p>
       </div>
     )
   }
@@ -41,15 +41,15 @@ export default async function ChangesPage() {
     <div className="h-full overflow-y-auto">
       <div className="max-w-3xl mx-auto px-6 py-8">
         <div className="mb-6">
-          <h1 className="text-white text-xl font-semibold">Change Explorer</h1>
-          <p className="text-zinc-500 text-sm mt-1">Every detected competitor move, explained by AI</p>
+          <h1 className="text-gray-900 text-xl font-semibold">Change Explorer</h1>
+          <p className="text-gray-500 text-sm mt-1">Every detected competitor move, explained by AI</p>
         </div>
 
         {!changes?.length ? (
-          <div className="text-center py-16 border border-dashed border-zinc-800 rounded-xl">
-            <GitCompare className="w-8 h-8 text-zinc-700 mx-auto mb-3" />
-            <p className="text-zinc-500 text-sm">No changes detected yet</p>
-            <p className="text-zinc-600 text-xs mt-1">
+          <div className="text-center py-16 border border-dashed border-gray-300 rounded-xl">
+            <GitCompare className="w-8 h-8 text-gray-300 mx-auto mb-3" />
+            <p className="text-gray-500 text-sm">No changes detected yet</p>
+            <p className="text-gray-400 text-xs mt-1">
               Add competitors in Settings, then the cron job will detect changes automatically
             </p>
           </div>
