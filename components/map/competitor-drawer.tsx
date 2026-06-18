@@ -1,7 +1,6 @@
 'use client'
 
 import { Sheet, SheetContent } from '@/components/ui/sheet'
-import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { ExternalLink, TrendingUp, AlertCircle, Zap } from 'lucide-react'
 import type { MockCompetitor } from './mock-data'

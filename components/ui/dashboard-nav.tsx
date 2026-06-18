@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
-import { Map, Users, GitCompare, TrendingUp, Swords, Mail, Settings } from 'lucide-react'
+import { Map, Users, GitCompare, Mail, Settings } from 'lucide-react'
 import type { User } from '@supabase/supabase-js'
 
 const navItems = [

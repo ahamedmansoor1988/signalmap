@@ -4,7 +4,6 @@ import { THEME_CONFIG } from '@/components/map/mock-data'
 import type { Theme } from '@/components/map/mock-data'
 import { ArrowLeft, ExternalLink, AlertCircle, Zap, TrendingUp } from 'lucide-react'
 import Link from 'next/link'
-import type { Json } from '@/lib/supabase/types'
 
 export default async function ChangeDetailPage({ params }: { params: { id: string } }) {
   const supabase = await createClient()

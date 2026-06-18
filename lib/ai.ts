@@ -1,58 +1,60 @@
-const ANTHROPIC_API_URL = 'https://api.anthropic.com/v1/messages'
-const MODEL = 'claude-sonnet-4-6'
+const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions'
+const MODEL = 'llama-3.3-70b-versatile'
 
-interface AnthropicMessage {
-  role: 'user' | 'assistant'
+interface GroqMessage {
+  role: 'system' | 'user' | 'assistant'
   content: string
 }
 
-interface AnthropicRequest {
+interface GroqRequest {
   model: string
   max_tokens: number
-  system?: string
-  messages: AnthropicMessage[]
+  messages: GroqMessage[]
+  temperature?: number
 }
 
-interface AnthropicResponse {
-  content: Array<{ type: string; text: string }>
+interface GroqResponse {
+  choices: Array<{ message: { content: string } }>
 }
 
 function stripFences(raw: string): string {
   return raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim()
 }
 
-async function callClaude(
+async function callGroq(
   systemPrompt: string,
   userMessage: string,
   maxTokens = 1024
 ): Promise<string> {
-  const apiKey = process.env.ANTHROPIC_API_KEY
-  if (!apiKey) throw new Error('ANTHROPIC_API_KEY is not set')
+  const apiKey = process.env.GROQ_API_KEY
+  if (!apiKey) throw new Error('GROQ_API_KEY is not set')
 
-  const body: AnthropicRequest = {
+  const body: GroqRequest = {
     model: MODEL,
     max_tokens: maxTokens,
-    system: systemPrompt,
-    messages: [{ role: 'user', content: userMessage }],
+    temperature: 0.3,
+    messages: [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: userMessage },
+    ],
   }
 
-  const res = await fetch(ANTHROPIC_API_URL, {
+  const res = await fetch(GROQ_API_URL, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01',
+      Authorization: `Bearer ${apiKey}`,
     },
     body: JSON.stringify(body),
   })
 
   if (!res.ok) {
     const err = await res.text()
-    throw new Error(`Anthropic API error ${res.status}: ${err}`)
+    throw new Error(`Groq API error ${res.status}: ${err}`)
   }
 
-  const data = (await res.json()) as AnthropicResponse
-  return data.content[0]?.text ?? ''
+  const data = (await res.json()) as GroqResponse
+  return data.choices[0]?.message?.content ?? ''
 }
 
 export async function callClaudeJSON<T>(
@@ -60,8 +62,8 @@ export async function callClaudeJSON<T>(
   userMessage: string,
   maxTokens = 1024
 ): Promise<T> {
-  const raw = await callClaude(systemPrompt, userMessage, maxTokens)
+  const raw = await callGroq(systemPrompt, userMessage, maxTokens)
   return JSON.parse(stripFences(raw)) as T
 }
 
-export { callClaude }
+export { callGroq as callClaude }
