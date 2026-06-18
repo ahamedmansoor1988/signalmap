@@ -39,7 +39,10 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ message: 'No pages to crawl', results })
   }
 
+  const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
+
   for (const page of pages) {
+    await sleep(2000) // 2s between pages to stay under Groq 12k TPM limit
     try {
       const crawled = await crawlPage(page.url)
 
@@ -65,7 +68,40 @@ export async function GET(req: NextRequest) {
         .update({ last_crawled_at: crawled.crawledAt })
         .eq('id', page.id)
 
-      // 2. Extract structured data and store in competitor_snapshots
+      // 2. Classic text diff — check for changes before spending AI tokens
+      const { data: prevSnap } = await supabase
+        .from('page_snapshots')
+        .select('id, text_content')
+        .eq('tracked_page_id', page.id)
+        .neq('id', newSnap.id)
+        .order('crawled_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+      if (!prevSnap?.text_content) {
+        // First snapshot — store structured extraction as baseline, no diff yet
+        const parsed = await extractPageData(page.url, crawled.text)
+        await supabase
+          .from('competitor_snapshots')
+          .upsert({
+            competitor_id: page.competitor_id,
+            tracked_page_id: page.id,
+            snapshot_date: today,
+            page_type: parsed.page_type,
+            raw_text: crawled.text.slice(0, 10000),
+            parsed_data: parsed as unknown as import('@/lib/supabase/types').Json,
+          }, { onConflict: 'tracked_page_id,snapshot_date' })
+        results.push({ page_id: page.id, url: page.url, status: 'first_snapshot' })
+        continue
+      }
+
+      const textDiff = computeDiff(prevSnap.text_content, crawled.text)
+      if (!textDiff.hasChanges) {
+        results.push({ page_id: page.id, url: page.url, status: 'no_changes' })
+        continue
+      }
+
+      // 3. Changes detected — extract structured data + compare with yesterday
       const parsed = await extractPageData(page.url, crawled.text)
       await supabase
         .from('competitor_snapshots')
@@ -78,7 +114,6 @@ export async function GET(req: NextRequest) {
           parsed_data: parsed as unknown as import('@/lib/supabase/types').Json,
         }, { onConflict: 'tracked_page_id,snapshot_date' })
 
-      // 3. Compare with yesterday's structured snapshot
       const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0]
       const { data: prevSnapshot } = await supabase
         .from('competitor_snapshots')
@@ -109,27 +144,7 @@ export async function GET(req: NextRequest) {
         }
       }
 
-      // 4. Classic text diff + AI analysis (existing flow)
-      const { data: prevSnap } = await supabase
-        .from('page_snapshots')
-        .select('id, text_content')
-        .eq('tracked_page_id', page.id)
-        .neq('id', newSnap.id)
-        .order('crawled_at', { ascending: false })
-        .limit(1)
-        .maybeSingle()
-
-      if (!prevSnap?.text_content) {
-        results.push({ page_id: page.id, url: page.url, status: 'first_snapshot' })
-        continue
-      }
-
-      const textDiff = computeDiff(prevSnap.text_content, crawled.text)
-      if (!textDiff.hasChanges) {
-        results.push({ page_id: page.id, url: page.url, status: 'no_changes' })
-        continue
-      }
-
+      // 4. AI summary of the text diff
       const diffSummary = [
         `REMOVED:\n${textDiff.removedLines.slice(0, 20).map((l) => `- ${l}`).join('\n')}`,
         `ADDED:\n${textDiff.addedLines.slice(0, 20).map((l) => `+ ${l}`).join('\n')}`,
