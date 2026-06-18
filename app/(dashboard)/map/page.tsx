@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import MarketMap from '@/components/map/market-map'
 import { MOCK_COMPETITORS } from '@/components/map/mock-data'
 import type { MapCompetitor } from '@/components/map/market-map'
+import { redirect } from 'next/navigation'
 
 export const metadata = { title: 'Market Map — SignalMap' }
 
@@ -18,6 +19,8 @@ export default async function MapPage() {
       .eq('user_id', user.id)
       .maybeSingle()
 
+    if (!membership) redirect('/onboarding')
+
     if (membership) {
       const { data: dbCompetitors } = await supabase
         .from('competitors')
@@ -29,6 +32,8 @@ export default async function MapPage() {
         `)
         .eq('org_id', membership.org_id)
         .order('risk_score', { ascending: false })
+
+      if (!dbCompetitors || dbCompetitors.length === 0) redirect('/onboarding')
 
       if (dbCompetitors && dbCompetitors.length > 0) {
         competitors = dbCompetitors.map((c) => {
