@@ -97,6 +97,28 @@ export async function GET(req: NextRequest) {
 
       const textDiff = computeDiff(prevSnap.text_content, crawled.text)
       if (!textDiff.hasChanges) {
+        // If this page has never had a structured snapshot, extract baseline now (one-time cost)
+        const { data: existingSnapshot } = await supabase
+          .from('competitor_snapshots')
+          .select('id')
+          .eq('tracked_page_id', page.id)
+          .limit(1)
+          .maybeSingle()
+
+        if (!existingSnapshot) {
+          const parsed = await extractPageData(page.url, crawled.text)
+          await supabase
+            .from('competitor_snapshots')
+            .upsert({
+              competitor_id: page.competitor_id,
+              tracked_page_id: page.id,
+              snapshot_date: today,
+              page_type: parsed.page_type,
+              raw_text: crawled.text.slice(0, 10000),
+              parsed_data: parsed as unknown as import('@/lib/supabase/types').Json,
+            }, { onConflict: 'tracked_page_id,snapshot_date' })
+        }
+
         results.push({ page_id: page.id, url: page.url, status: 'no_changes' })
         continue
       }
