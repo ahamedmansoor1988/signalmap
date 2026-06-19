@@ -5,6 +5,7 @@ import { computeDiff } from '@/lib/diff'
 import { callClaudeJSON } from '@/lib/ai'
 import { SUMMARIZE_SYSTEM } from '@/lib/prompts/summarize'
 import { extractPageData, diffParsedPages, changeTypeFromPageType, calculateRiskScores } from '@/lib/extractor'
+import { getCrawlTier, shouldCrawlNow } from '@/lib/crawl-schedule'
 
 export const runtime = 'nodejs'
 export const maxDuration = 300
@@ -26,23 +27,39 @@ export async function GET(req: NextRequest) {
   }
 
   const supabase = await createServiceClient()
-  const results: Array<{ page_id: string; url: string; status: string; change_id?: string }> = []
+  const results: Array<{ page_id: string; url: string; tier: string; status: string; change_id?: string }> = []
   const today = new Date().toISOString().split('T')[0]
 
-  const { data: pages } = await supabase
+  // Fetch all tracked pages — filter by frequency tier in JS rather than SQL
+  // (URL-pattern-based intervals can't be expressed as a single WHERE clause)
+  const { data: allPages } = await supabase
     .from('tracked_pages')
-    .select('id, url, competitor_id')
+    .select('id, url, competitor_id, last_crawled_at')
     .order('last_crawled_at', { ascending: true, nullsFirst: true })
-    .limit(20)
 
-  if (!pages?.length) {
+  if (!allPages?.length) {
     return NextResponse.json({ message: 'No pages to crawl', results })
+  }
+
+  // Only crawl pages whose frequency interval has elapsed since last crawl
+  const pages = allPages
+    .filter((p) => shouldCrawlNow(p.last_crawled_at, p.url))
+    .slice(0, 20)
+
+  if (!pages.length) {
+    return NextResponse.json({
+      message: 'All pages crawled recently — nothing due yet',
+      total: allPages.length,
+      skipped: allPages.length,
+      results,
+    })
   }
 
   const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
   for (const page of pages) {
     await sleep(2000) // 2s between pages to stay under Groq 12k TPM limit
+    const tier = getCrawlTier(page.url)
     try {
       const crawled = await crawlPage(page.url)
 
@@ -59,7 +76,7 @@ export async function GET(req: NextRequest) {
         .single()
 
       if (!newSnap) {
-        results.push({ page_id: page.id, url: page.url, status: 'snapshot_failed' })
+        results.push({ page_id: page.id, url: page.url, tier, status: 'snapshot_failed' })
         continue
       }
 
@@ -91,7 +108,7 @@ export async function GET(req: NextRequest) {
             raw_text: crawled.text.slice(0, 10000),
             parsed_data: parsed as unknown as import('@/lib/supabase/types').Json,
           }, { onConflict: 'tracked_page_id,snapshot_date' })
-        results.push({ page_id: page.id, url: page.url, status: 'first_snapshot' })
+        results.push({ page_id: page.id, url: page.url, tier, status: 'first_snapshot' })
         continue
       }
 
@@ -119,7 +136,7 @@ export async function GET(req: NextRequest) {
             }, { onConflict: 'tracked_page_id,snapshot_date' })
         }
 
-        results.push({ page_id: page.id, url: page.url, status: 'no_changes' })
+        results.push({ page_id: page.id, url: page.url, tier, status: 'no_changes' })
         continue
       }
 
@@ -197,9 +214,9 @@ export async function GET(req: NextRequest) {
         .update({ risk_score: ai.risk_score })
         .eq('id', page.competitor_id)
 
-      results.push({ page_id: page.id, url: page.url, status: 'change_detected', change_id: change?.id })
+      results.push({ page_id: page.id, url: page.url, tier, status: 'change_detected', change_id: change?.id })
     } catch (err) {
-      results.push({ page_id: page.id, url: page.url, status: `error: ${String(err)}` })
+      results.push({ page_id: page.id, url: page.url, tier, status: `error: ${String(err)}` })
     }
   }
 
@@ -234,5 +251,9 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  return NextResponse.json({ crawled: pages.length, results })
+  return NextResponse.json({
+    crawled: pages.length,
+    skipped: allPages.length - pages.length,
+    results,
+  })
 }

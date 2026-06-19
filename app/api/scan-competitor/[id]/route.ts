@@ -27,11 +27,21 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
     return NextResponse.json({ error: 'No tracked pages found' }, { status: 404 })
   }
 
+  const scannedAt = new Date().toISOString()
+
   const results: ScanPage[] = await Promise.all(
     pages.map(async (page) => {
       try {
         const crawled = await crawlPage(page.url)
         const parsed = await extractPageData(page.url, crawled.text)
+
+        // Stamp last_crawled_at so the cron frequency filter won't double-crawl
+        // within this page's tier interval (minimum 2h for changelog)
+        await supabase
+          .from('tracked_pages')
+          .update({ last_crawled_at: scannedAt })
+          .eq('id', page.id)
+
         return {
           url: page.url,
           label: page.label,
@@ -51,5 +61,5 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
     })
   )
 
-  return NextResponse.json({ pages: results, scannedAt: new Date().toISOString() })
+  return NextResponse.json({ pages: results, scannedAt })
 }
