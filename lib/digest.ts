@@ -74,11 +74,17 @@ export async function sendDigest(): Promise<DigestResult> {
       .limit(1)
       .maybeSingle()
 
-    if (!membership?.user_id) continue
-
-    // Get email from auth
-    const { data: { user } } = await supabase.auth.admin.getUserById(membership.user_id)
-    const email = user?.email
+    // Resolve email: try auth lookup, fall back to DIGEST_EMAIL env var
+    let email: string | undefined
+    if (membership?.user_id) {
+      try {
+        const { data: authData } = await supabase.auth.admin.getUserById(membership.user_id)
+        email = authData?.user?.email ?? undefined
+      } catch {
+        // auth.admin unavailable in some environments
+      }
+    }
+    email = email ?? process.env.DIGEST_EMAIL
     if (!email) continue
 
     const totalDiffs = groups.reduce((sum: number, g: CompetitorGroup) => sum + g.diffs.length, 0)
