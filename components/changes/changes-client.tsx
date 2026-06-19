@@ -26,10 +26,7 @@ export default function ChangesClient({ changes }: { changes: Change[] }) {
     return Array.from(new Set(names)).sort()
   }, [changes])
 
-  const themes = useMemo(() => {
-    const t = changes.map((c) => c.theme).filter((x): x is string => x !== null)
-    return Array.from(new Set(t)).sort()
-  }, [changes])
+  const THEME_PILLS = ['All', 'Pricing', 'Messaging', 'Product', 'Home'] as const
 
   const filtered = useMemo(() => {
     return changes.filter((c) => {
@@ -57,16 +54,25 @@ export default function ChangesClient({ changes }: { changes: Change[] }) {
           ))}
         </select>
 
-        <select
-          value={theme}
-          onChange={(e) => setTheme(e.target.value)}
-          className="text-sm border border-gray-200 rounded-lg px-3 py-1.5 text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent"
-        >
-          <option value="">All types</option>
-          {themes.map((t) => (
-            <option key={t} value={t}>{t}</option>
-          ))}
-        </select>
+        <div className="flex items-center gap-1">
+          {THEME_PILLS.map((pill) => {
+            const value = pill === 'All' ? '' : pill
+            const active = theme === value
+            return (
+              <button
+                key={pill}
+                onClick={() => setTheme(value)}
+                className={`text-sm px-3 py-1.5 rounded-lg transition-all ${
+                  active
+                    ? 'bg-violet-600 text-white font-medium'
+                    : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'
+                }`}
+              >
+                {pill}
+              </button>
+            )
+          })}
+        </div>
 
         <button
           onClick={() => setShowSeen((s) => !s)}
