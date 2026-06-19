@@ -26,7 +26,7 @@ export default function ChangesClient({ changes }: { changes: Change[] }) {
     return Array.from(new Set(names)).sort()
   }, [changes])
 
-  const THEME_PILLS = ['All', 'Pricing', 'Messaging', 'Product', 'Home'] as const
+  const THEME_PILLS = ['All', 'Pricing', 'Messaging', 'Product', 'Home', 'Hiring'] as const
 
   const filtered = useMemo(() => {
     return changes.filter((c) => {
