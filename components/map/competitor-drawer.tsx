@@ -179,7 +179,7 @@ export default function CompetitorDrawer({ competitor, open, onClose }: {
 
               {!scanning && !scanPages && !scanError && (
                 <p className="text-gray-400 text-xs leading-snug">
-                  Crawl their homepage and pricing page right now — get current tiers, headlines, and positioning without waiting for tomorrow's cron.
+                  Crawl their homepage and pricing page right now — get current tiers, headlines, and positioning without waiting for the daily cron.
                 </p>
               )}
 
