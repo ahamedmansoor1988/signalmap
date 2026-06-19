@@ -1,5 +1,23 @@
 # SignalMap — Sprint Status
 
+## Sprint 3.5 — COMPLETE ✅ (Change Explorer upgrade)
+**Date:** 2026-06-19
+**Commit:** `2de49ac`
+
+### Completed
+- [x] **Click-to-expand cards** — `ChangeCard` is now a client component; clicking expands inline to show impact bullets, suggested actions, and HTML diff without navigating to `/changes/[id]`
+- [x] **Filter bar** — `ChangesClient` wrapper adds competitor name dropdown, change type dropdown, show/hide seen toggle, live "N new" badge
+- [x] **Mark as seen** — `POST /api/changes/[id]/seen` stamps `seen_at`; card fades to 50% opacity with optimistic UI update; seen cards hidden by default (toggle to show)
+- [x] **Email digest** — `lib/digest.ts` + `POST /api/digest` sends Resend email; cron calls it automatically when changes are detected. Email: unseen changes from last 24h, one card per change, links to Change Explorer
+- [x] **SQL migration** — `changes.seen_at TIMESTAMPTZ` — must run in Supabase dashboard: `ALTER TABLE changes ADD COLUMN IF NOT EXISTS seen_at TIMESTAMPTZ;`
+
+### Setup required (one-time)
+1. Run SQL in Supabase dashboard: `ALTER TABLE changes ADD COLUMN IF NOT EXISTS seen_at TIMESTAMPTZ;`
+2. Get Resend API key at resend.com → add `RESEND_API_KEY=re_...` to Vercel environment variables
+3. Verify a sender domain in Resend and update `from:` in `lib/digest.ts` (currently uses `onboarding@resend.dev` for testing)
+
+---
+
 ## Sprint 3 — COMPLETE ✅
 **Date:** 2026-06-18
 
