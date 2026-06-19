@@ -185,6 +185,7 @@ export interface Database {
           impact_bullets: Json | null
           suggested_actions: Json | null
           detected_at: string
+          seen_at: string | null
         }
         Insert: {
           id?: string
@@ -200,6 +201,7 @@ export interface Database {
           impact_bullets?: Json | null
           suggested_actions?: Json | null
           detected_at?: string
+          seen_at?: string | null
         }
         Update: {
           id?: string
@@ -215,6 +217,7 @@ export interface Database {
           impact_bullets?: Json | null
           suggested_actions?: Json | null
           detected_at?: string
+          seen_at?: string | null
         }
         Relationships: [
           {

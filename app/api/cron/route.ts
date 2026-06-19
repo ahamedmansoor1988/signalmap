@@ -6,6 +6,7 @@ import { callClaudeJSON } from '@/lib/ai'
 import { SUMMARIZE_SYSTEM } from '@/lib/prompts/summarize'
 import { extractPageData, diffParsedPages, changeTypeFromPageType, calculateRiskScores } from '@/lib/extractor'
 import { getCrawlTier, shouldCrawlNow } from '@/lib/crawl-schedule'
+import { sendDigest } from '@/lib/digest'
 
 export const runtime = 'nodejs'
 export const maxDuration = 300
@@ -251,9 +252,21 @@ export async function GET(req: NextRequest) {
     }
   }
 
+  // Send daily digest if there were any detected changes
+  let digest: { sent: boolean; count?: number; reason?: string } = { sent: false, reason: 'skipped' }
+  const hasChanges = results.some((r) => r.status === 'change_detected')
+  if (hasChanges) {
+    try {
+      digest = await sendDigest()
+    } catch {
+      digest = { sent: false, reason: 'digest_error' }
+    }
+  }
+
   return NextResponse.json({
     crawled: pages.length,
     skipped: allPages.length - pages.length,
     results,
+    digest,
   })
 }

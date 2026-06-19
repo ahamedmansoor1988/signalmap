@@ -1,7 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
-import ChangeCard from '@/components/changes/change-card'
-import { GitCompare } from 'lucide-react'
+import ChangesClient from '@/components/changes/changes-client'
 
 export const metadata = { title: 'Change Explorer — SignalMap' }
 
@@ -45,20 +44,8 @@ export default async function ChangesPage() {
           <p className="text-gray-500 text-sm mt-1">Every detected competitor move, explained by AI</p>
         </div>
 
-        {!changes?.length ? (
-          <div className="text-center py-16 border border-dashed border-gray-300 rounded-xl">
-            <GitCompare className="w-8 h-8 text-gray-300 mx-auto mb-3" />
-            <p className="text-gray-500 text-sm">No changes detected yet</p>
-            <p className="text-gray-400 text-xs mt-1">
-              Add competitors in Settings, then the cron job will detect changes automatically
-            </p>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-            {changes.map((c) => <ChangeCard key={c.id} change={c as any} />)}
-          </div>
-        )}
+        {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+        <ChangesClient changes={(changes ?? []) as any} />
       </div>
     </div>
   )
