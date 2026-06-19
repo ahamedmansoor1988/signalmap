@@ -64,6 +64,8 @@ export interface Database {
           website: string
           logo_url: string | null
           risk_score: number
+          ai_summary: string | null
+          suggested_actions: Json | null
           created_at: string
         }
         Insert: {
@@ -73,6 +75,8 @@ export interface Database {
           website: string
           logo_url?: string | null
           risk_score?: number
+          ai_summary?: string | null
+          suggested_actions?: Json | null
           created_at?: string
         }
         Update: {
@@ -82,6 +86,8 @@ export interface Database {
           website?: string
           logo_url?: string | null
           risk_score?: number
+          ai_summary?: string | null
+          suggested_actions?: Json | null
           created_at?: string
         }
         Relationships: [

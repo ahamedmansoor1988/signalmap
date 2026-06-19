@@ -25,7 +25,7 @@ export default async function MapPage() {
       const { data: dbCompetitors } = await supabase
         .from('competitors')
         .select(`
-          id, name, website, risk_score,
+          id, name, website, risk_score, ai_summary, suggested_actions,
           changes:tracked_pages(
             changes(theme, ai_signal, detected_at, risk_score)
           )
@@ -60,7 +60,9 @@ export default async function MapPage() {
             theme,
             last_signal: latestChange?.ai_signal ?? 'No signals yet — cron runs daily at 8am UTC',
             signals_count: allChanges.length,
-            description: `Tracking ${c.website}`,
+            description: c.ai_summary ?? `Tracking ${c.website}`,
+            ai_summary: c.ai_summary ?? undefined,
+            suggested_actions: (c.suggested_actions as string[] | null) ?? undefined,
           }
         })
       }

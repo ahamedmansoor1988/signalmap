@@ -9,6 +9,8 @@ export interface MockCompetitor {
   last_signal: string
   signals_count: number
   description: string
+  ai_summary?: string
+  suggested_actions?: string[]
 }
 
 export const THEME_CONFIG: Record<Theme, { color: string; glow: string; bg: string; label: string }> = {
