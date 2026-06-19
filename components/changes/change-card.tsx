@@ -154,16 +154,6 @@ export default function ChangeCard({ change }: { change: Change }) {
             </div>
           )}
 
-          {change.diff_html && (
-            <div>
-              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">What changed</p>
-              <div
-                className="text-xs font-mono bg-gray-50 rounded-lg p-3 overflow-x-auto max-h-60 overflow-y-auto [&_.diff-add]:text-emerald-700 [&_.diff-add]:bg-emerald-50 [&_.diff-remove]:text-red-700 [&_.diff-remove]:bg-red-50"
-                dangerouslySetInnerHTML={{ __html: change.diff_html }}
-              />
-            </div>
-          )}
-
           <div className="flex items-center justify-between pt-1 border-t border-gray-100">
             <a
               href={`/changes/${change.id}`}
