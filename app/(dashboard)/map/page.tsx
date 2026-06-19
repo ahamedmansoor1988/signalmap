@@ -3,6 +3,8 @@ import MarketMap from '@/components/map/market-map'
 import { MOCK_COMPETITORS } from '@/components/map/mock-data'
 import type { MapCompetitor } from '@/components/map/market-map'
 import { redirect } from 'next/navigation'
+import { normalizeActions } from '@/lib/typed-actions'
+import type { Json } from '@/lib/supabase/types'
 
 export const metadata = { title: 'Market Map — SignalMap' }
 
@@ -62,7 +64,7 @@ export default async function MapPage() {
             signals_count: allChanges.length,
             description: c.ai_summary ?? `Tracking ${c.website}`,
             ai_summary: c.ai_summary ?? undefined,
-            suggested_actions: (c.suggested_actions as string[] | null) ?? undefined,
+            suggested_actions: normalizeActions(c.suggested_actions as Json) || undefined,
           }
         })
       }

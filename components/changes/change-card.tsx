@@ -5,6 +5,7 @@ import { AlertTriangle, Clock, TrendingUp, ChevronDown, ChevronUp, Eye, Check } 
 import { THEME_CONFIG } from '@/components/map/mock-data'
 import type { Theme } from '@/components/map/mock-data'
 import type { Database } from '@/lib/supabase/types'
+import { normalizeActions, getTypeStyle } from '@/lib/typed-actions'
 
 type Change = Database['public']['Tables']['changes']['Row'] & {
   tracked_pages: {
@@ -37,7 +38,7 @@ export default function ChangeCard({ change }: { change: Change }) {
   const riskLevel = risk >= 75 ? 'High' : risk >= 50 ? 'Medium' : 'Low'
   const riskColors = { High: 'text-red-600', Medium: 'text-amber-600', Low: 'text-emerald-600' }
   const impactBullets = Array.isArray(change.impact_bullets) ? (change.impact_bullets as string[]) : []
-  const suggestedActions = Array.isArray(change.suggested_actions) ? (change.suggested_actions as string[]) : []
+  const suggestedActions = normalizeActions(change.suggested_actions)
 
   async function markSeen(e: React.MouseEvent) {
     e.stopPropagation()
@@ -144,12 +145,21 @@ export default function ChangeCard({ change }: { change: Change }) {
             <div>
               <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Suggested actions</p>
               <div className="space-y-1.5">
-                {suggestedActions.map((action, i) => (
-                  <div key={i} className="flex items-start gap-2 text-sm text-gray-700 bg-violet-50 rounded-lg px-3 py-2">
-                    <span className="text-violet-500 shrink-0">→</span>
-                    {action}
-                  </div>
-                ))}
+                {suggestedActions.map((action, i) => {
+                  const style = getTypeStyle(action.type)
+                  return (
+                    <div key={i} className="flex items-start gap-2 bg-gray-50 border border-gray-100 rounded-lg px-3 py-2">
+                      {style ? (
+                        <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded border shrink-0 mt-0.5 ${style.cls}`}>
+                          {style.label}
+                        </span>
+                      ) : (
+                        <span className="text-violet-500 shrink-0 mt-0.5">→</span>
+                      )}
+                      <span className="text-sm text-gray-700">{action.action}</span>
+                    </div>
+                  )
+                })}
               </div>
             </div>
           )}

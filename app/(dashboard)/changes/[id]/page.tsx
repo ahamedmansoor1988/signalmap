@@ -4,6 +4,7 @@ import { THEME_CONFIG } from '@/components/map/mock-data'
 import type { Theme } from '@/components/map/mock-data'
 import { ArrowLeft, ExternalLink, AlertCircle, Zap, TrendingUp } from 'lucide-react'
 import Link from 'next/link'
+import { normalizeActions, getTypeStyle } from '@/lib/typed-actions'
 
 export default async function ChangeDetailPage({ params }: { params: { id: string } }) {
   const supabase = await createClient()
@@ -21,7 +22,7 @@ export default async function ChangeDetailPage({ params }: { params: { id: strin
   const theme = change.theme as Theme | null
   const cfg = theme && THEME_CONFIG[theme] ? THEME_CONFIG[theme] : null
   const impactBullets = change.impact_bullets as string[] | null
-  const suggestedActions = change.suggested_actions as string[] | null
+  const suggestedActions = normalizeActions(change.suggested_actions)
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const competitor = (change.tracked_pages as any)?.competitors
@@ -113,19 +114,28 @@ export default async function ChangeDetailPage({ params }: { params: { id: strin
                 </ul>
               </div>
             )}
-            {suggestedActions && suggestedActions.length > 0 && (
+            {suggestedActions.length > 0 && (
               <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
                 <div className="flex items-center gap-2 mb-3">
                   <span className="text-violet-500 text-sm">→</span>
                   <span className="text-gray-700 text-sm font-medium">Actions</span>
                 </div>
-                <ul className="space-y-1.5">
-                  {suggestedActions.map((a, i) => (
-                    <li key={i} className="flex items-start gap-2 text-gray-500 text-xs">
-                      <span className="text-violet-500 mt-0.5">›</span>
-                      {a}
-                    </li>
-                  ))}
+                <ul className="space-y-2">
+                  {suggestedActions.map((a, i) => {
+                    const style = getTypeStyle(a.type)
+                    return (
+                      <li key={i} className="flex items-start gap-2">
+                        {style ? (
+                          <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded border shrink-0 mt-0.5 ${style.cls}`}>
+                            {style.label}
+                          </span>
+                        ) : (
+                          <span className="text-violet-500 mt-0.5 shrink-0">›</span>
+                        )}
+                        <span className="text-gray-600 text-xs leading-relaxed">{a.action}</span>
+                      </li>
+                    )
+                  })}
                 </ul>
               </div>
             )}

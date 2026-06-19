@@ -3,13 +3,14 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
-import { Map, Users, GitCompare, Mail, Settings } from 'lucide-react'
+import { Map, Users, GitCompare, BarChart3, Mail, Settings } from 'lucide-react'
 import type { User } from '@supabase/supabase-js'
 
 const navItems = [
   { href: '/map', icon: Map, label: 'Market Map' },
   { href: '/competitor', icon: Users, label: 'Competitors' },
   { href: '/changes', icon: GitCompare, label: 'Changes' },
+  { href: '/brief', icon: BarChart3, label: 'Weekly Brief' },
   { href: '/digest', icon: Mail, label: 'Digest' },
   { href: '/settings', icon: Settings, label: 'Settings' },
 ]

@@ -50,6 +50,47 @@ export interface Database {
           }
         ]
       }
+      weekly_briefs: {
+        Row: {
+          id: string
+          org_id: string
+          week_start: string
+          summary: string | null
+          top_moves: Json | null
+          trend_summary: string | null
+          recommended_actions: Json | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          org_id: string
+          week_start: string
+          summary?: string | null
+          top_moves?: Json | null
+          trend_summary?: string | null
+          recommended_actions?: Json | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          org_id?: string
+          week_start?: string
+          summary?: string | null
+          top_moves?: Json | null
+          trend_summary?: string | null
+          recommended_actions?: Json | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'weekly_briefs_org_id_fkey'
+            columns: ['org_id']
+            isOneToOne: false
+            referencedRelation: 'organizations'
+            referencedColumns: ['id']
+          }
+        ]
+      }
       organizations: {
         Row: {
           id: string

@@ -2,11 +2,12 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { callClaudeJSON } from '@/lib/ai'
 import { COMPETITOR_PROFILE_SYSTEM } from '@/lib/prompts/competitor-profile'
+import { generateTypedActions } from '@/lib/personalized-actions'
+import { normalizeActions } from '@/lib/typed-actions'
 import type { Json } from '@/lib/supabase/types'
 
 interface InsightsResult {
   summary: string
-  suggested_actions: string[]
 }
 
 export const runtime = 'nodejs'
@@ -17,7 +18,7 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
 
   const { data: competitor } = await supabase
     .from('competitors')
-    .select('id, name, website, ai_summary, suggested_actions')
+    .select('id, name, website, org_id, ai_summary, suggested_actions')
     .eq('id', params.id)
     .single()
 
@@ -27,7 +28,7 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
   if (competitor.ai_summary) {
     return NextResponse.json({
       summary: competitor.ai_summary,
-      suggested_actions: (competitor.suggested_actions as string[]) ?? [],
+      suggested_actions: normalizeActions(competitor.suggested_actions as Json),
       cached: true,
     })
   }
@@ -61,13 +62,26 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
     512
   )
 
+  // Fetch company profile for personalized actions
+  const { data: profile } = await supabase
+    .from('company_profiles')
+    .select('*')
+    .eq('org_id', competitor.org_id)
+    .maybeSingle()
+
+  const typedActions = await generateTypedActions(
+    profile ?? null,
+    competitor.name,
+    context
+  )
+
   await supabase
     .from('competitors')
     .update({
       ai_summary: result.summary,
-      suggested_actions: result.suggested_actions as unknown as Json,
+      suggested_actions: typedActions as unknown as Json,
     })
     .eq('id', params.id)
 
-  return NextResponse.json({ ...result, cached: false })
+  return NextResponse.json({ summary: result.summary, suggested_actions: typedActions, cached: false })
 }

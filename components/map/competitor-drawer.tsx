@@ -9,10 +9,12 @@ import {
 } from 'lucide-react'
 import type { MockCompetitor } from './mock-data'
 import { THEME_CONFIG } from './mock-data'
+import { getTypeStyle } from '@/lib/typed-actions'
+import type { TypedAction } from '@/lib/typed-actions'
 
 interface Insights {
   summary: string
-  suggested_actions: string[]
+  suggested_actions: TypedAction[]
 }
 
 interface ScanPage {
@@ -326,15 +328,24 @@ export default function CompetitorDrawer({ competitor, open, onClose }: {
             </div>
           ) : insights?.suggested_actions?.length ? (
             <div className="space-y-2">
-              {insights.suggested_actions.map((action, i) => (
-                <div
-                  key={i}
-                  className="flex items-start gap-2.5 bg-violet-50 rounded-lg p-3 border border-violet-100"
-                >
-                  <ArrowRight className="w-3.5 h-3.5 text-violet-500 mt-0.5 shrink-0" />
-                  <span className="text-gray-700 text-xs leading-snug">{action}</span>
-                </div>
-              ))}
+              {insights.suggested_actions.map((action, i) => {
+                const style = getTypeStyle(action.type)
+                return (
+                  <div
+                    key={i}
+                    className="flex items-start gap-2.5 bg-gray-50 rounded-lg p-3 border border-gray-100"
+                  >
+                    {style ? (
+                      <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded border shrink-0 mt-0.5 ${style.cls}`}>
+                        {style.label}
+                      </span>
+                    ) : (
+                      <ArrowRight className="w-3.5 h-3.5 text-violet-500 mt-0.5 shrink-0" />
+                    )}
+                    <span className="text-gray-700 text-xs leading-snug">{action.action}</span>
+                  </div>
+                )
+              })}
             </div>
           ) : isReal ? (
             <p className="text-gray-400 text-sm italic">Suggested actions will appear alongside the strategic summary.</p>

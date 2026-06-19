@@ -1,3 +1,5 @@
+import type { TypedAction } from '@/lib/typed-actions'
+
 export type Theme = 'AI Features' | 'Pricing' | 'Enterprise' | 'GTM' | 'Content'
 
 export interface MockCompetitor {
@@ -10,7 +12,7 @@ export interface MockCompetitor {
   signals_count: number
   description: string
   ai_summary?: string
-  suggested_actions?: string[]
+  suggested_actions?: TypedAction[]
 }
 
 export const THEME_CONFIG: Record<Theme, { color: string; glow: string; bg: string; label: string }> = {

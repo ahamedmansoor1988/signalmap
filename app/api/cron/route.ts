@@ -7,9 +7,14 @@ import { SUMMARIZE_SYSTEM } from '@/lib/prompts/summarize'
 import { extractPageData, diffParsedPages, changeTypeFromPageType, calculateRiskScores } from '@/lib/extractor'
 import { getCrawlTier, shouldCrawlNow } from '@/lib/crawl-schedule'
 import { sendDigest } from '@/lib/digest'
+import { generateWeeklyBrief } from '@/lib/weekly-brief'
+import { generateTypedActions } from '@/lib/personalized-actions'
+import type { Database } from '@/lib/supabase/types'
 
 export const runtime = 'nodejs'
 export const maxDuration = 300
+
+type CompanyProfile = Database['public']['Tables']['company_profiles']['Row']
 
 interface SummarizeResult {
   summary: string
@@ -18,7 +23,6 @@ interface SummarizeResult {
   risk_score: number
   theme: string
   impact_bullets: string[]
-  suggested_actions: string[]
 }
 
 export async function GET(req: NextRequest) {
@@ -55,6 +59,27 @@ export async function GET(req: NextRequest) {
       results,
     })
   }
+
+  // Pre-fetch competitor metadata and company profiles for personalized actions
+  const uniqueCompetitorIds = Array.from(new Set(pages.map((p) => p.competitor_id)))
+  const { data: competitorMeta } = await supabase
+    .from('competitors')
+    .select('id, name, org_id')
+    .in('id', uniqueCompetitorIds)
+
+  const competitorMap: Record<string, { name: string; org_id: string }> = Object.fromEntries(
+    (competitorMeta ?? []).map((c) => [c.id, { name: c.name, org_id: c.org_id }])
+  )
+
+  const uniqueOrgIds = Array.from(new Set(Object.values(competitorMap).map((c) => c.org_id)))
+  const { data: profileRows } = await supabase
+    .from('company_profiles')
+    .select('*')
+    .in('org_id', uniqueOrgIds)
+
+  const profileByOrg: Record<string, CompanyProfile> = Object.fromEntries(
+    (profileRows ?? []).map((p) => [p.org_id, p])
+  )
 
   const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
@@ -192,6 +217,15 @@ export async function GET(req: NextRequest) {
 
       const ai = await callClaudeJSON<SummarizeResult>(SUMMARIZE_SYSTEM, diffSummary, 1024)
 
+      // 5. Personalized actions using company profile context
+      const comp = competitorMap[page.competitor_id]
+      const profile = comp?.org_id ? (profileByOrg[comp.org_id] ?? null) : null
+      const typedActions = await generateTypedActions(
+        profile,
+        comp?.name ?? 'Competitor',
+        diffSummary
+      )
+
       const { data: change } = await supabase
         .from('changes')
         .insert({
@@ -205,7 +239,7 @@ export async function GET(req: NextRequest) {
           risk_score: ai.risk_score,
           theme: ai.theme,
           impact_bullets: ai.impact_bullets,
-          suggested_actions: ai.suggested_actions,
+          suggested_actions: typedActions as unknown as import('@/lib/supabase/types').Json,
         })
         .select()
         .single()
@@ -263,10 +297,21 @@ export async function GET(req: NextRequest) {
     }
   }
 
+  // Generate weekly brief on Mondays (day 1)
+  let brief: { sent: boolean; orgs?: number; reason?: string } = { sent: false, reason: 'not_monday' }
+  if (new Date().getDay() === 1) {
+    try {
+      brief = await generateWeeklyBrief()
+    } catch {
+      brief = { sent: false, reason: 'brief_error' }
+    }
+  }
+
   return NextResponse.json({
     crawled: pages.length,
     skipped: allPages.length - pages.length,
     results,
     digest,
+    brief,
   })
 }

@@ -7,6 +7,5 @@ Respond with JSON only:
   "confidence": 0-100,
   "risk_score": 0-100,
   "theme": "AI Features | Pricing | Enterprise | GTM | Content",
-  "impact_bullets": ["bullet 1", "bullet 2", "bullet 3"],
-  "suggested_actions": ["action 1", "action 2"]
+  "impact_bullets": ["bullet 1", "bullet 2", "bullet 3"]
 }`
