@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import AddCompetitorForm from '@/components/competitor/add-competitor-form'
 import CompetitorList from '@/components/competitor/competitor-list'
+import CompanyProfileForm from '@/components/settings/company-profile-form'
 
 export const metadata = { title: 'Settings — SignalMap' }
 
@@ -41,11 +42,18 @@ export default async function SettingsPage() {
     orgId = membership.org_id
   }
 
-  const { data: competitors } = await supabase
-    .from('competitors')
-    .select('*, tracked_pages(*)')
-    .eq('org_id', orgId)
-    .order('created_at', { ascending: false })
+  const [{ data: competitors }, { data: companyProfile }] = await Promise.all([
+    supabase
+      .from('competitors')
+      .select('*, tracked_pages(*)')
+      .eq('org_id', orgId)
+      .order('created_at', { ascending: false }),
+    supabase
+      .from('company_profiles')
+      .select('*')
+      .eq('org_id', orgId)
+      .maybeSingle(),
+  ])
 
   return (
     <div className="h-full overflow-y-auto">
@@ -54,6 +62,14 @@ export default async function SettingsPage() {
           <h1 className="text-gray-900 text-xl font-semibold">Settings</h1>
           <p className="text-gray-500 text-sm mt-1">Manage competitors and tracked pages</p>
         </div>
+
+        <section className="mb-8">
+          <h2 className="text-gray-900 text-sm font-semibold mb-1">Company Profile</h2>
+          <p className="text-gray-400 text-xs mb-4">Used to personalise AI analysis and suggested actions</p>
+          <div className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
+            <CompanyProfileForm initialProfile={companyProfile ?? null} />
+          </div>
+        </section>
 
         <section className="mb-8">
           <h2 className="text-gray-900 text-sm font-semibold mb-4">Add Competitor</h2>

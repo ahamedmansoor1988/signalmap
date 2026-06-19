@@ -3,6 +3,53 @@ export type Json = string | number | boolean | null | { [key: string]: Json | un
 export interface Database {
   public: {
     Tables: {
+      company_profiles: {
+        Row: {
+          id: string
+          org_id: string
+          company_name: string | null
+          description: string | null
+          icp: string | null
+          pricing_model: string | null
+          differentiators: string | null
+          website_url: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          org_id: string
+          company_name?: string | null
+          description?: string | null
+          icp?: string | null
+          pricing_model?: string | null
+          differentiators?: string | null
+          website_url?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          org_id?: string
+          company_name?: string | null
+          description?: string | null
+          icp?: string | null
+          pricing_model?: string | null
+          differentiators?: string | null
+          website_url?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'company_profiles_org_id_fkey'
+            columns: ['org_id']
+            isOneToOne: true
+            referencedRelation: 'organizations'
+            referencedColumns: ['id']
+          }
+        ]
+      }
       organizations: {
         Row: {
           id: string
