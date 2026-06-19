@@ -154,21 +154,6 @@ export default async function ChangeDetailPage({ params }: { params: { id: strin
               </div>
             </div>
           )}
-
-          {/* Diff View */}
-          {change.diff_html && (
-            <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
-              <div className="px-4 py-3 border-b border-gray-200 bg-gray-50">
-                <span className="text-gray-700 text-sm font-medium">Page Diff</span>
-              </div>
-              <div className="p-4 overflow-x-auto">
-                <pre
-                  className="text-xs font-mono leading-relaxed [&_.diff-add]:text-emerald-700 [&_.diff-add]:bg-emerald-50 [&_.diff-remove]:text-red-700 [&_.diff-remove]:bg-red-50 [&_.diff-context]:text-gray-400"
-                  dangerouslySetInnerHTML={{ __html: change.diff_html }}
-                />
-              </div>
-            </div>
-          )}
         </div>
       </div>
     </div>
