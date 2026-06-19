@@ -70,7 +70,8 @@ export async function sendDigest(): Promise<DigestResult> {
       .from('org_members')
       .select('user_id')
       .eq('org_id', orgId)
-      .eq('role', 'owner')
+      .order('created_at', { ascending: true })
+      .limit(1)
       .maybeSingle()
 
     if (!membership?.user_id) continue
