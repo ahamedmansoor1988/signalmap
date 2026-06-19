@@ -39,35 +39,78 @@ const CLUSTER_CENTERS: Record<Theme, { x: number; y: number }> = {
   'Content':     { x: 0.50, y: 0.50 },
 }
 
+// Entry animation constants
+const ENTRY_DURATION = 24  // ticks ≈ 400ms at 60fps
+const ENTRY_STAGGER  = 3   // ticks between each bubble ≈ 50ms
+const HALO_FADE_TICKS = 40
+
 function riskToRadius(score: number): number {
   return 20 + (score / 100) * 24
 }
 
-export default function MarketMap({ competitors, isLiveData }: Props) {
-  const canvasRef = useRef<HTMLCanvasElement>(null)
-  const containerRef = useRef<HTMLDivElement>(null)
-  const nodesRef = useRef<Node[]>([])
-  const animFrameRef = useRef<number>(0)
-  const tickRef = useRef(0)
-  const [selected, setSelected] = useState<MapCompetitor | null>(null)
-  const [hovered, setHovered] = useState<string | null>(null)
-  const [search, setSearch] = useState('')
-  const [activeTheme, setActiveTheme] = useState<Theme | null>(null)
-  const [dims, setDims] = useState({ w: 0, h: 0 })
+function easeOutCubic(t: number): number {
+  return 1 - Math.pow(1 - t, 3)
+}
 
+export default function MarketMap({ competitors, isLiveData }: Props) {
+  const canvasRef    = useRef<HTMLCanvasElement>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
+  const nodesRef     = useRef<Node[]>([])
+  const animFrameRef = useRef<number>(0)
+  const tickRef      = useRef(0)
+  const [selected, setSelected]     = useState<MapCompetitor | null>(null)
+  const [hovered, setHovered]       = useState<string | null>(null)
+  const [search, setSearch]         = useState('')
+  const [activeTheme, setActiveTheme] = useState<Theme | null>(null)
+  const [dims, setDims]             = useState({ w: 0, h: 0 })
+
+  // Pre-simulate physics synchronously so nodes are at stable positions
+  // before the first draw — no movement during render, only fade+scale
   const initNodes = useCallback((w: number, h: number) => {
-    nodesRef.current = competitors.map((c) => {
+    const nodes: Node[] = competitors.map((c) => {
       const target = CLUSTER_CENTERS[c.theme]
       return {
         ...c,
-        x: w / 2 + (Math.random() - 0.5) * 40,
-        y: h / 2 + (Math.random() - 0.5) * 40,
+        x: target.x * w + (Math.random() - 0.5) * 60,
+        y: target.y * h + (Math.random() - 0.5) * 60,
         vx: 0,
         vy: 0,
         targetX: target.x * w,
         targetY: target.y * h,
       }
     })
+
+    // Run physics headlessly until settled
+    for (let tick = 0; tick < 180; tick++) {
+      nodes.forEach((a) => {
+        a.vx += (a.targetX - a.x) * 0.10
+        a.vy += (a.targetY - a.y) * 0.10
+
+        nodes.forEach((b) => {
+          if (a === b) return
+          const dx = a.x - b.x
+          const dy = a.y - b.y
+          const dist = Math.max(Math.hypot(dx, dy), 1)
+          const minDist = riskToRadius(a.risk_score) + riskToRadius(b.risk_score) + 12
+          if (dist < minDist) {
+            const force = (minDist - dist) / dist * 0.4
+            a.vx += dx * force
+            a.vy += dy * force
+          }
+        })
+
+        a.vx *= 0.88
+        a.vy *= 0.88
+        a.x  += a.vx
+        a.y  += a.vy
+
+        const r = riskToRadius(a.risk_score)
+        a.x = Math.max(r + 10, Math.min(w - r - 10, a.x))
+        a.y = Math.max(r + 10, Math.min(h - r - 10, a.y))
+      })
+    }
+
+    nodesRef.current = nodes
   }, [competitors])
 
   useEffect(() => {
@@ -89,45 +132,41 @@ export default function MarketMap({ competitors, isLiveData }: Props) {
   }, [dims, initNodes])
 
   useEffect(() => {
-    if (dims.w === 0) return
-    nodesRef.current.forEach((n) => {
-      const target = CLUSTER_CENTERS[n.theme]
-      n.targetX = target.x * dims.w
-      n.targetY = target.y * dims.h
-    })
-  }, [dims])
-
-  useEffect(() => {
     const canvas = canvasRef.current
     if (!canvas || dims.w === 0) return
     const ctx = canvas.getContext('2d')
     if (!ctx) return
 
-    canvas.width = dims.w
+    canvas.width  = dims.w
     canvas.height = dims.h
+
+    // Total ticks until all bubbles have fully appeared
+    const totalEntryTicks = (competitors.length - 1) * ENTRY_STAGGER + ENTRY_DURATION + 6
 
     function draw() {
       if (!ctx || !canvas) return
       tickRef.current++
-      const progress = Math.min(tickRef.current / 60, 1)
+      const tick = tickRef.current
 
-      // Light background
+      // Background
       ctx.fillStyle = '#f8fafc'
       ctx.fillRect(0, 0, canvas.width, canvas.height)
 
-      // Cluster halos
+      const haloProgress = Math.min(tick / HALO_FADE_TICKS, 1)
+
+      // Cluster halos — fade in once with haloProgress
       const themes = Object.keys(THEME_CONFIG) as Theme[]
       themes.forEach((theme) => {
-        const cfg = THEME_CONFIG[theme]
+        const cfg         = THEME_CONFIG[theme]
         const clusterNodes = nodesRef.current.filter((n) => n.theme === theme)
         if (!clusterNodes.length) return
 
-        const cx = clusterNodes.reduce((s, n) => s + n.x, 0) / clusterNodes.length
-        const cy = clusterNodes.reduce((s, n) => s + n.y, 0) / clusterNodes.length
+        const cx      = clusterNodes.reduce((s, n) => s + n.x, 0) / clusterNodes.length
+        const cy      = clusterNodes.reduce((s, n) => s + n.y, 0) / clusterNodes.length
         const maxDist = Math.max(...clusterNodes.map((n) => Math.hypot(n.x - cx, n.y - cy))) + 60
 
         const isActive = activeTheme === null || activeTheme === theme
-        const alpha = isActive ? 0.10 * progress : 0.03 * progress
+        const alpha    = isActive ? 0.10 * haloProgress : 0.03 * haloProgress
 
         const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, maxDist)
         grad.addColorStop(0, cfg.color + Math.round(alpha * 255).toString(16).padStart(2, '0'))
@@ -137,109 +176,88 @@ export default function MarketMap({ competitors, isLiveData }: Props) {
         ctx.fillStyle = grad
         ctx.fill()
 
-        if (progress > 0.5) {
+        if (haloProgress > 0.5) {
           ctx.save()
-          ctx.globalAlpha = Math.min((progress - 0.5) * 2, 1) * (isActive ? 0.6 : 0.2)
-          ctx.font = '700 11px ui-sans-serif, system-ui, sans-serif'
-          ctx.fillStyle = cfg.color
-          ctx.textAlign = 'center'
+          ctx.globalAlpha = Math.min((haloProgress - 0.5) * 2, 1) * (isActive ? 0.6 : 0.2)
+          ctx.font        = '700 11px ui-sans-serif, system-ui, sans-serif'
+          ctx.fillStyle   = cfg.color
+          ctx.textAlign   = 'center'
           ctx.fillText(cfg.label.toUpperCase(), cx, cy - maxDist + 18)
           ctx.restore()
         }
       })
 
-      // Physics — run for first 80 ticks (~1.3s at 60fps), then freeze
-      const nodes = nodesRef.current
-      if (tickRef.current < 80) {
-        nodes.forEach((a) => {
-          const springK = 0.10
-          a.vx += (a.targetX - a.x) * springK
-          a.vy += (a.targetY - a.y) * springK
-
-          nodes.forEach((b) => {
-            if (a === b) return
-            const dx = a.x - b.x
-            const dy = a.y - b.y
-            const dist = Math.max(Math.hypot(dx, dy), 1)
-            const minDist = riskToRadius(a.risk_score) + riskToRadius(b.risk_score) + 12
-            if (dist < minDist) {
-              const force = (minDist - dist) / dist * 0.4
-              a.vx += dx * force
-              a.vy += dy * force
-            }
-          })
-
-          a.vx *= 0.88
-          a.vy *= 0.88
-          a.x += a.vx
-          a.y += a.vy
-
-          const r = riskToRadius(a.risk_score)
-          a.x = Math.max(r + 10, Math.min(canvas.width - r - 10, a.x))
-          a.y = Math.max(r + 10, Math.min(canvas.height - r - 10, a.y))
-        })
-      }
-
-      // Draw nodes
+      // Draw nodes — fade + scale in per-bubble, then static
       const filteredSearch = search.toLowerCase()
-      nodes.forEach((node) => {
-        const cfg = THEME_CONFIG[node.theme]
-        const r = riskToRadius(node.risk_score)
-        const isHovered = hovered === node.id
-        const isSelected = selected?.id === node.id
+      nodesRef.current.forEach((node, index) => {
+        const cfg         = THEME_CONFIG[node.theme]
+        const r           = riskToRadius(node.risk_score)
+        const isHovered   = hovered === node.id
+        const isSelected  = selected?.id === node.id
         const matchesSearch = !filteredSearch || node.name.toLowerCase().includes(filteredSearch)
-        const matchesTheme = activeTheme === null || activeTheme === node.theme
-        const isActive = matchesSearch && matchesTheme
+        const matchesTheme  = activeTheme === null || activeTheme === node.theme
+        const isActive    = matchesSearch && matchesTheme
+
+        // Per-bubble entry progress (0 → 1), staggered by index
+        const nodeStartTick = index * ENTRY_STAGGER
+        const t       = Math.max(0, Math.min(1, (tick - nodeStartTick) / ENTRY_DURATION))
+        const ease    = easeOutCubic(t)
+        const scale   = 0.8 + 0.2 * ease
+        const opacity = ease
 
         ctx.save()
-        ctx.globalAlpha = isActive ? 1 : 0.2
+        ctx.globalAlpha = opacity * (isActive ? 1 : 0.2)
+
+        // Translate to node center, scale from there, draw at origin
+        ctx.translate(node.x, node.y)
+        ctx.scale(scale, scale)
 
         if (isHovered || isSelected) {
           ctx.shadowColor = cfg.color
-          ctx.shadowBlur = 16
+          ctx.shadowBlur  = 16
         }
 
-        // Node fill — solid color on light bg
-        const grad = ctx.createRadialGradient(node.x - r * 0.3, node.y - r * 0.3, 0, node.x, node.y, r)
+        // Node fill
+        const grad = ctx.createRadialGradient(-r * 0.3, -r * 0.3, 0, 0, 0, r)
         grad.addColorStop(0, cfg.color + 'ee')
         grad.addColorStop(1, cfg.color + 'aa')
         ctx.beginPath()
-        ctx.arc(node.x, node.y, r, 0, Math.PI * 2)
+        ctx.arc(0, 0, r, 0, Math.PI * 2)
         ctx.fillStyle = grad
         ctx.fill()
 
         // Border
         ctx.strokeStyle = isHovered || isSelected ? cfg.color : cfg.color + 'cc'
-        ctx.lineWidth = isHovered || isSelected ? 2.5 : 1.5
+        ctx.lineWidth   = isHovered || isSelected ? 2.5 : 1.5
         ctx.stroke()
         ctx.shadowBlur = 0
 
-        // Label — white text on colored node
-        ctx.font = `${isHovered || isSelected ? '700' : '600'} ${r > 32 ? '11' : '10'}px ui-sans-serif, system-ui, sans-serif`
-        ctx.fillStyle = '#ffffff'
-        ctx.textAlign = 'center'
-        ctx.textBaseline = 'middle'
-        ctx.fillText(node.name, node.x, node.y)
+        // Label
+        ctx.font          = `${isHovered || isSelected ? '700' : '600'} ${r > 32 ? '11' : '10'}px ui-sans-serif, system-ui, sans-serif`
+        ctx.fillStyle     = '#ffffff'
+        ctx.textAlign     = 'center'
+        ctx.textBaseline  = 'middle'
+        ctx.fillText(node.name, 0, 0)
 
-        // Risk score below
+        // Risk score below (unscaled position: r below center)
         if (r > 28 || isHovered) {
-          ctx.font = '600 9px ui-sans-serif, system-ui, sans-serif'
+          ctx.font      = '600 9px ui-sans-serif, system-ui, sans-serif'
           ctx.fillStyle = cfg.color
-          ctx.fillText(`${node.risk_score}`, node.x, node.y + r + 12)
+          ctx.fillText(`${node.risk_score}`, 0, r + 12)
         }
 
         ctx.restore()
       })
 
-      // Keep looping while physics is active; after settling, only redraw on interaction
-      if (tickRef.current < 90) {
+      // Loop only during entry animation; static after all bubbles appear
+      if (tick < totalEntryTicks) {
         animFrameRef.current = requestAnimationFrame(draw)
       }
     }
 
     animFrameRef.current = requestAnimationFrame(draw)
     return () => cancelAnimationFrame(animFrameRef.current)
-  }, [dims, hovered, selected, search, activeTheme])
+  }, [dims, hovered, selected, search, activeTheme, competitors.length])
 
   function getNodeAt(cx: number, cy: number): Node | null {
     for (const node of nodesRef.current) {
