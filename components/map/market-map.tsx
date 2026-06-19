@@ -148,11 +148,11 @@ export default function MarketMap({ competitors, isLiveData }: Props) {
         }
       })
 
-      // Physics — run for first 250 ticks then let nodes rest
+      // Physics — run for first 80 ticks (~1.3s at 60fps), then freeze
       const nodes = nodesRef.current
-      if (tickRef.current < 250) {
+      if (tickRef.current < 80) {
         nodes.forEach((a) => {
-          const springK = 0.06
+          const springK = 0.10
           a.vx += (a.targetX - a.x) * springK
           a.vy += (a.targetY - a.y) * springK
 
@@ -169,8 +169,8 @@ export default function MarketMap({ competitors, isLiveData }: Props) {
             }
           })
 
-          a.vx *= 0.82
-          a.vy *= 0.82
+          a.vx *= 0.88
+          a.vy *= 0.88
           a.x += a.vx
           a.y += a.vy
 
@@ -232,7 +232,7 @@ export default function MarketMap({ competitors, isLiveData }: Props) {
       })
 
       // Keep looping while physics is active; after settling, only redraw on interaction
-      if (tickRef.current < 260) {
+      if (tickRef.current < 90) {
         animFrameRef.current = requestAnimationFrame(draw)
       }
     }
