@@ -42,13 +42,47 @@ export default async function BriefPage() {
       .limit(10),
     supabase
       .from('competitors')
-      .select('name, website')
+      .select('id, name, website')
       .eq('org_id', membership.org_id),
   ])
 
   const websiteByName: Record<string, string> = {}
   for (const c of orgCompetitors ?? []) {
     websiteByName[c.name.toLowerCase()] = c.website
+  }
+
+  // ── Metrics: last-7-days changes across all org competitors ──
+  const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
+  const competitorIds = (orgCompetitors ?? []).map(c => c.id)
+
+  let totalChanges = 0
+  let highImpact   = 0
+  let themesDetected = 0
+  let competitorsActive = 0
+
+  if (competitorIds.length > 0) {
+    const { data: orgPages } = await supabase
+      .from('tracked_pages')
+      .select('id, competitor_id')
+      .in('competitor_id', competitorIds)
+
+    const pageIds = (orgPages ?? []).map(p => p.id)
+
+    if (pageIds.length > 0) {
+      const { data: recentChanges } = await supabase
+        .from('changes')
+        .select('risk_score, theme, tracked_page_id')
+        .in('tracked_page_id', pageIds)
+        .gte('detected_at', sevenDaysAgo)
+
+      const changes = recentChanges ?? []
+      const pageToComp = new Map((orgPages ?? []).map(p => [p.id, p.competitor_id]))
+
+      totalChanges     = changes.length
+      highImpact       = changes.filter(c => (c.risk_score ?? 0) > 50 || c.theme === 'Pricing').length
+      themesDetected   = new Set(changes.map(c => c.theme).filter(Boolean)).size
+      competitorsActive = new Set(changes.map(c => pageToComp.get(c.tracked_page_id)).filter(Boolean)).size
+    }
   }
 
   const latest = briefs?.[0] ?? null
@@ -77,6 +111,25 @@ export default async function BriefPage() {
             <p className="text-gray-400 text-sm">Generated every Monday at 9am UTC</p>
           )}
         </div>
+
+        {/* Metrics bar */}
+        {latest && (
+          <div className="grid grid-cols-4 gap-3 mb-6">
+            {[
+              { value: totalChanges,      label: 'Changes detected',       red: false },
+              { value: highImpact,        label: 'High impact this week',  red: highImpact > 0 },
+              { value: themesDetected,    label: 'Themes detected',        red: false },
+              { value: competitorsActive, label: 'Competitors active',     red: false },
+            ].map(({ value, label, red }) => (
+              <div key={label} className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm text-center">
+                <p className={`text-2xl font-bold leading-none mb-1.5 ${red ? 'text-red-500' : 'text-gray-900'}`}>
+                  {value}
+                </p>
+                <p className="text-gray-400 text-[11px] leading-tight">{label}</p>
+              </div>
+            ))}
+          </div>
+        )}
 
         {!latest ? (
           /* Empty state */
