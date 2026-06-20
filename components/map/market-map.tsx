@@ -34,13 +34,13 @@ const CX = W / 2
 const CY = H / 2
 
 // ── Sizes ──────────────────────────────────────────────────────
-const THEME_R  = 240   // ring where theme cards sit
-const COMP_D   = 125   // distance from theme centre to competitor logo
+const THEME_R  = 290   // push themes wide to fill canvas
+const COMP_D   = 145   // distance from theme centre to competitor logo
 const NODE_R   = 22    // logo circle radius
 const TW       = 126   // theme card width
 const TH       = 48    // theme card height
 const TRND     = 10    // theme card corner radius
-const FAN      = Math.PI  // 180° semicircle — 5 logos get 45° spacing, very clean
+const FAN      = Math.PI  // 180° semicircle
 
 function dot(count: number) {
   if (!count)   return '#d1d5db'
@@ -276,13 +276,32 @@ export default function MarketMap({ competitors, isLiveData }: Props) {
                   <circle cx={NODE_R * 0.7} cy={-NODE_R * 0.7} r={6} fill="white" />
                   <circle cx={NODE_R * 0.7} cy={-NODE_R * 0.7} r={4.5} fill={d} />
 
-                  {/* name */}
-                  <text y={NODE_R + 14} textAnchor="middle"
-                    fontSize={10} fontWeight={isHov ? '700' : '500'}
-                    fill={isHov ? '#111827' : '#6b7280'}
-                    fontFamily="ui-sans-serif,system-ui,sans-serif">
-                    {c.name}
-                  </text>
+                  {/* name — placed outward from theme to avoid line overlap */}
+                  {(() => {
+                    const tp2 = tPos.get(c.theme)
+                    if (!cp || !tp2) return null
+                    const ax = cp.x - tp2.x
+                    const ay = cp.y - tp2.y
+                    const al = Math.sqrt(ax*ax + ay*ay) || 1
+                    const nx = ax / al  // unit vector away from theme
+                    const ny = ay / al
+                    const lx = nx * (NODE_R + 13)
+                    const ly = ny * (NODE_R + 13)
+                    const anchor = Math.abs(nx) > 0.6
+                      ? (nx > 0 ? 'start' : 'end')
+                      : 'middle'
+                    return (
+                      <text
+                        x={lx} y={ly}
+                        textAnchor={anchor}
+                        dominantBaseline={Math.abs(ny) > 0.6 ? (ny > 0 ? 'hanging' : 'auto') : 'central'}
+                        fontSize={10} fontWeight={isHov ? '700' : '500'}
+                        fill={isHov ? '#111827' : '#6b7280'}
+                        fontFamily="ui-sans-serif,system-ui,sans-serif">
+                        {c.name}
+                      </text>
+                    )
+                  })()}
                 </g>
               )
             })}
