@@ -58,9 +58,17 @@ export default async function SettingsPage() {
   return (
     <div className="h-full overflow-y-auto">
       <div className="max-w-2xl mx-auto px-6 py-8">
-        <div className="mb-8">
-          <h1 className="text-gray-900 text-xl font-semibold">Settings</h1>
-          <p className="text-gray-500 text-sm mt-1">Manage competitors and tracked pages</p>
+        <div className="flex items-start justify-between mb-8">
+          <div>
+            <h1 className="text-gray-900 text-xl font-semibold">Settings</h1>
+            <p className="text-gray-500 text-sm mt-1">Manage competitors and tracked pages</p>
+          </div>
+          <a
+            href="/onboarding"
+            className="flex items-center gap-1.5 text-xs font-semibold text-violet-600 border border-violet-200 px-3 py-2 rounded-xl hover:bg-violet-50 transition-all"
+          >
+            ✦ Re-run setup
+          </a>
         </div>
 
         <section className="mb-8">

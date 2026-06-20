@@ -40,12 +40,5 @@ export default async function OnboardingPage() {
     orgId = membership.org_id
   }
 
-  const { count } = await supabase
-    .from('competitors')
-    .select('id', { count: 'exact', head: true })
-    .eq('org_id', orgId)
-
-  if (count && count > 0) redirect('/map')
-
   return <OnboardingClient orgId={orgId} />
 }
