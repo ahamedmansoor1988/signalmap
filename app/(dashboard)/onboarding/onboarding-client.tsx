@@ -122,19 +122,10 @@ export default function OnboardingClient({ orgId, existingCount }: Props) {
     setStep('saving')
 
     try {
-      // Delete all existing competitors for this org before adding new ones
+      // Delete all existing competitors via server API (respects FK order, bypasses RLS)
       if (existingCount > 0) {
-        const { data: existing } = await supabase
-          .from('competitors')
-          .select('id')
-          .eq('org_id', orgId)
-
-        if (existing && existing.length > 0) {
-          const ids = existing.map(c => c.id)
-          // Delete tracked_pages first (cascades to changes)
-          await supabase.from('tracked_pages').delete().in('competitor_id', ids)
-          await supabase.from('competitors').delete().in('id', ids)
-        }
+        const res = await fetch('/api/competitors/reset', { method: 'DELETE' })
+        if (!res.ok) throw new Error('Failed to clear existing competitors')
       }
 
       for (const c of toAdd) {
