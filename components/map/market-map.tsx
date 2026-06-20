@@ -160,7 +160,7 @@ export default function MarketMap({ competitors, isLiveData }: Props) {
           {/* ── Zoom group ── */}
           <g transform={`translate(${tx} ${ty}) scale(${zoom})`}>
 
-            {/* thin lines from theme → competitor */}
+            {/* ── Curved lines (drawn first = behind everything) ── */}
             {themes.map(theme => {
               const tp  = tPos.get(theme)!
               const cfg = THEME_CONFIG[theme]
@@ -169,12 +169,22 @@ export default function MarketMap({ competitors, isLiveData }: Props) {
                 .map(c => {
                   const cp = cPos.get(c.id)
                   if (!cp) return null
+                  // Quadratic bezier — control point pulled 40% toward map center
+                  const mx = tp.x + (cp.x - tp.x) * 0.5
+                  const my = tp.y + (cp.y - tp.y) * 0.5
+                  // nudge control point perpendicular for a gentle curve
+                  const dx = cp.x - tp.x
+                  const dy = cp.y - tp.y
+                  const len = Math.sqrt(dx * dx + dy * dy) || 1
+                  const qx = mx - (dy / len) * 28
+                  const qy = my + (dx / len) * 28
                   return (
-                    <line key={c.id}
-                      x1={tp.x} y1={tp.y} x2={cp.x} y2={cp.y}
-                      stroke={cfg.color} strokeWidth={1.2}
-                      strokeOpacity={vis(c) ? 0.25 : 0.04}
-                      strokeDasharray="4 3"
+                    <path key={c.id}
+                      d={`M ${tp.x} ${tp.y} Q ${qx} ${qy} ${cp.x} ${cp.y}`}
+                      fill="none"
+                      stroke={cfg.color}
+                      strokeWidth={1.4}
+                      strokeOpacity={vis(c) ? 0.3 : 0.04}
                     />
                   )
                 })
