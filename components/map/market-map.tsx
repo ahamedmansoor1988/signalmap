@@ -126,11 +126,11 @@ export default function MarketMap({ competitors, isLiveData }: Props) {
   return (
     <div className="flex flex-col h-full bg-slate-50">
       <style>{`
-        @keyframes smFadeUp {
-          from { opacity: 0; transform: translateY(8px); }
-          to   { opacity: 1; transform: translateY(0); }
+        @keyframes smFadeIn {
+          from { opacity: 0; }
+          to   { opacity: 1; }
         }
-        .sm-node { animation: smFadeUp 0.45s ease both; }
+        .sm-node { animation: smFadeIn 0.5s ease both; }
       `}</style>
 
       {/* ── Toolbar ── */}
