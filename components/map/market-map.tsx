@@ -27,82 +27,80 @@ interface Props {
   isLiveData: boolean
 }
 
-function activityColor(count: number) {
-  if (!count) return '#9ca3af'
-  if (count < 3) return '#F97316'
-  return '#EF4444'
+// ── Canvas ─────────────────────────────────────────────────────
+const W  = 1300
+const H  = 820
+const CX = W / 2
+const CY = H / 2 + 30   // nudge center down so title has room
+
+// ── Sizes ──────────────────────────────────────────────────────
+const THEME_R  = 240   // ring where theme cards sit
+const COMP_D   = 125   // distance from theme centre to competitor logo
+const NODE_R   = 22    // logo circle radius
+const TW       = 126   // theme card width
+const TH       = 48    // theme card height
+const TRND     = 10    // theme card corner radius
+const FAN      = 1.9   // total fan arc (≈108°) — competitors spread ±54° around radial
+
+function dot(count: number) {
+  if (!count)   return '#d1d5db'
+  if (count < 3) return '#f97316'
+  return '#ef4444'
 }
 
-function CompetitorLogo({
-  competitor,
-  onClick,
-}: {
-  competitor: MapCompetitor
-  onClick: () => void
-}) {
-  const [imgErr, setImgErr] = useState(false)
-  const logoUrl = imgErr ? null : getLogoUrl(competitor.website)
-  const dot     = activityColor(competitor.activity_count ?? 0)
-  const initial = (competitor.name[0] ?? '?').toUpperCase()
+// ── Layout ─────────────────────────────────────────────────────
+function layout(competitors: MapCompetitor[]) {
+  const all    = Object.keys(THEME_CONFIG) as Theme[]
+  const themes = all.filter(t => competitors.some(c => c.theme === t))
+  const N      = themes.length
 
-  return (
-    <button
-      onClick={onClick}
-      className="flex flex-col items-center gap-1 group"
-      title={competitor.name}
-    >
-      <div className="relative">
-        <div className="w-11 h-11 rounded-full bg-white border-2 border-gray-200 group-hover:border-violet-400 transition-colors shadow-sm flex items-center justify-center overflow-hidden">
-          {logoUrl ? (
-            <img
-              src={logoUrl}
-              alt={competitor.name}
-              className="w-8 h-8 object-contain"
-              onError={() => setImgErr(true)}
-            />
-          ) : (
-            <span className="text-sm font-bold text-gray-600">{initial}</span>
-          )}
-        </div>
-        {/* Activity dot */}
-        <span
-          className="absolute top-0 right-0 w-3 h-3 rounded-full border-2 border-white"
-          style={{ backgroundColor: dot }}
-        />
-      </div>
-      <span className="text-[10px] text-gray-500 group-hover:text-gray-800 transition-colors leading-tight text-center max-w-[52px] truncate">
-        {competitor.name}
-      </span>
-    </button>
-  )
-}
+  const tPos = new Map<Theme, { x: number; y: number; angle: number }>()
+  themes.forEach((theme, i) => {
+    const angle = -Math.PI / 2 + (i / N) * 2 * Math.PI
+    tPos.set(theme, { x: CX + THEME_R * Math.cos(angle), y: CY + THEME_R * Math.sin(angle), angle })
+  })
 
-export default function MarketMap({ competitors, isLiveData }: Props) {
-  const [selected, setSelected] = useState<MapCompetitor | null>(null)
-  const [search,   setSearch]   = useState('')
+  const cPos = new Map<string, { x: number; y: number }>()
+  for (const theme of themes) {
+    const tp    = tPos.get(theme)!
+    const group = competitors.filter(c => c.theme === theme)
+    const Nc    = group.length
+    if (!Nc) continue
 
-  const allThemes    = Object.keys(THEME_CONFIG) as Theme[]
-  const activeThemes = allThemes.filter(t => competitors.some(c => c.theme === t))
-  const searchLower  = search.toLowerCase()
-
-  function visible(c: MapCompetitor) {
-    if (!searchLower) return true
-    return (
-      c.name.toLowerCase().includes(searchLower) ||
-      c.theme.toLowerCase().includes(searchLower)
-    )
+    const step = Nc > 1 ? FAN / (Nc - 1) : 0
+    group.forEach((comp, i) => {
+      const a = tp.angle - FAN / 2 + i * step
+      cPos.set(comp.id, {
+        x: tp.x + COMP_D * Math.cos(a),
+        y: tp.y + COMP_D * Math.sin(a),
+      })
+    })
   }
 
+  return { tPos, cPos, themes }
+}
+
+// ── Component ──────────────────────────────────────────────────
+export default function MarketMap({ competitors, isLiveData }: Props) {
+  const [selected,  setSelected]  = useState<MapCompetitor | null>(null)
+  const [hovered,   setHovered]   = useState<string | null>(null)
+  const [search,    setSearch]    = useState('')
+  const [zoom,      setZoom]      = useState(1)
+  const [imgErrors, setImgErrors] = useState<Set<string>>(new Set())
+
+  const { tPos, cPos, themes } = layout(competitors)
+  const q = search.toLowerCase()
+  const vis = (c: MapCompetitor) =>
+    !q || c.name.toLowerCase().includes(q) || c.theme.toLowerCase().includes(q)
+
+  const tx = CX * (1 - zoom)
+  const ty = CY * (1 - zoom)
+
   return (
-    <div className="flex flex-col h-full bg-slate-50">
+    <div className="flex flex-col h-full" style={{ background: '#f8f9fb' }}>
       <style>{`
-        @keyframes clusterIn {
-          from { opacity: 0; transform: scale(0.92); }
-          to   { opacity: 1; transform: scale(1); }
-        }
-        .cluster-card {
-          animation: clusterIn 0.4s cubic-bezier(0.16,1,0.3,1) both;
-        }
+        @keyframes fadeIn { from { opacity:0 } to { opacity:1 } }
+        .sm-fade { animation: fadeIn .5s ease both }
       `}</style>
 
       {/* ── Toolbar ── */}
@@ -110,20 +108,16 @@ export default function MarketMap({ competitors, isLiveData }: Props) {
         <div className="relative">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
           <input
-            type="text"
+            value={search} onChange={e => setSearch(e.target.value)}
             placeholder="Search competitors, topics, or keywords…"
-            value={search}
-            onChange={e => setSearch(e.target.value)}
             className="bg-gray-50 border border-gray-200 rounded-lg pl-8 pr-3 py-1.5 text-xs text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-violet-500 w-60"
           />
         </div>
-        <button className="flex items-center gap-1.5 text-xs px-3 py-1.5 border border-gray-200 rounded-lg text-gray-600 bg-white hover:bg-gray-50 transition-colors shrink-0">
-          Watchlist: Core PM Tools
-          <ChevronDown className="w-3 h-3 text-gray-400 shrink-0" />
+        <button className="flex items-center gap-1.5 text-xs px-3 py-1.5 border border-gray-200 rounded-lg text-gray-600 bg-white hover:bg-gray-50 shrink-0">
+          Watchlist: Core PM Tools <ChevronDown className="w-3 h-3 text-gray-400" />
         </button>
-        <button className="flex items-center gap-1.5 text-xs px-3 py-1.5 border border-gray-200 rounded-lg text-gray-600 bg-white hover:bg-gray-50 transition-colors shrink-0">
-          <Calendar className="w-3.5 h-3.5 text-gray-400" />
-          Last 7 days
+        <button className="flex items-center gap-1.5 text-xs px-3 py-1.5 border border-gray-200 rounded-lg text-gray-600 bg-white hover:bg-gray-50 shrink-0">
+          <Calendar className="w-3.5 h-3.5 text-gray-400" /> Last 7 days
         </button>
         {!isLiveData && (
           <span className="flex items-center gap-1.5 text-xs text-amber-600 bg-amber-50 px-2.5 py-1 rounded-full border border-amber-200 shrink-0">
@@ -131,97 +125,182 @@ export default function MarketMap({ competitors, isLiveData }: Props) {
             Demo data — <Link href="/settings" className="underline underline-offset-2">add competitors</Link>
           </span>
         )}
-        <div className="flex-1 min-w-0" />
-        <Link
-          href="/settings"
-          className="flex items-center gap-1.5 text-xs px-3 py-1.5 bg-violet-600 text-white rounded-lg hover:bg-violet-700 transition-colors font-medium shrink-0"
-        >
-          <Plus className="w-3.5 h-3.5" />
-          Add Competitor
+        <div className="flex-1" />
+        <Link href="/settings" className="flex items-center gap-1.5 text-xs px-3 py-1.5 bg-violet-600 text-white rounded-lg hover:bg-violet-700 font-medium shrink-0">
+          <Plus className="w-3.5 h-3.5" /> Add Competitor
         </Link>
       </div>
 
-      {/* ── Cluster Grid ── */}
-      <div className="flex-1 overflow-y-auto">
-        <div className="max-w-5xl mx-auto px-8 py-10">
+      {/* ── Canvas ── */}
+      <div className="flex-1 relative overflow-hidden">
+        <svg width="100%" height="100%" viewBox={`0 0 ${W} ${H}`} className="absolute inset-0">
 
-          {/* Header */}
-          <div className="text-center mb-10">
-            <h2 className="text-sm font-bold tracking-[0.2em] text-gray-800 uppercase">AI Market Map</h2>
-            <p className="text-xs text-gray-400 mt-1">Visualize what&apos;s happening in your market</p>
-            <div className="mt-3 inline-flex items-center gap-1.5 text-xs text-gray-500 bg-white border border-gray-200 rounded-full px-3 py-1 shadow-sm">
-              <span className="text-violet-500">✦</span>
-              {activeThemes.length} major themes detected
-            </div>
-          </div>
+          {/* clip paths for favicons */}
+          <defs>
+            {competitors.map(c => (
+              <clipPath key={c.id} id={`cl-${c.id}`}>
+                <circle r={NODE_R - 3} cx={0} cy={0} />
+              </clipPath>
+            ))}
+            <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+              <feDropShadow dx="0" dy="2" stdDeviation="3" floodColor="#0001" />
+            </filter>
+          </defs>
 
-          {/* Theme clusters — responsive grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {activeThemes.map((theme, ti) => {
-              const cfg   = THEME_CONFIG[theme]
-              const group = competitors.filter(c => c.theme === theme)
-              const visibleGroup = group.filter(visible)
+          {/* ── Title (fixed, above zoom group) ── */}
+          <text x={W / 2} y={30} textAnchor="middle" fontSize={12} fontWeight="700"
+            letterSpacing="0.2em" fill="#111827" fontFamily="ui-sans-serif,system-ui,sans-serif">
+            AI MARKET MAP
+          </text>
+          <text x={W / 2} y={48} textAnchor="middle" fontSize={10} fill="#9ca3af"
+            fontFamily="ui-sans-serif,system-ui,sans-serif">
+            Visualize what&apos;s happening in your market
+          </text>
 
+          {/* ── Zoom group ── */}
+          <g transform={`translate(${tx} ${ty}) scale(${zoom})`}>
+
+            {/* thin lines from theme → competitor */}
+            {themes.map(theme => {
+              const tp  = tPos.get(theme)!
+              const cfg = THEME_CONFIG[theme]
+              return competitors
+                .filter(c => c.theme === theme)
+                .map(c => {
+                  const cp = cPos.get(c.id)
+                  if (!cp) return null
+                  return (
+                    <line key={c.id}
+                      x1={tp.x} y1={tp.y} x2={cp.x} y2={cp.y}
+                      stroke={cfg.color} strokeWidth={1.2}
+                      strokeOpacity={vis(c) ? 0.25 : 0.04}
+                      strokeDasharray="4 3"
+                    />
+                  )
+                })
+            })}
+
+            {/* ── Theme cards ── */}
+            {themes.map((theme, ti) => {
+              const tp  = tPos.get(theme)!
+              const cfg = THEME_CONFIG[theme]
+              const cnt = competitors.filter(c => c.theme === theme).length
               return (
-                <div
-                  key={theme}
-                  className="cluster-card bg-white rounded-2xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow overflow-hidden"
-                  style={{ animationDelay: `${ti * 60}ms`, borderTopColor: cfg.color, borderTopWidth: 3 }}
-                >
-                  {/* Theme header */}
-                  <div className="px-4 pt-4 pb-3" style={{ backgroundColor: cfg.bg }}>
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold tracking-wide" style={{ color: cfg.color }}>
-                        {cfg.label}
-                      </span>
-                      <span className="text-[10px] font-medium px-2 py-0.5 rounded-full" style={{ color: cfg.color, backgroundColor: 'white', opacity: 0.9 }}>
-                        ✦ {group.length}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Competitor logos */}
-                  <div className="px-4 py-4">
-                    {visibleGroup.length === 0 ? (
-                      <p className="text-gray-300 text-xs text-center py-2">No matches</p>
-                    ) : (
-                      <div className="flex flex-wrap gap-3">
-                        {visibleGroup.map(c => (
-                          <CompetitorLogo
-                            key={c.id}
-                            competitor={c}
-                            onClick={() => setSelected(c)}
-                          />
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </div>
+                <g key={theme} className="sm-fade" style={{ animationDelay: `${ti * 70}ms` }}>
+                  <rect
+                    x={tp.x - TW / 2} y={tp.y - TH / 2}
+                    width={TW} height={TH} rx={TRND}
+                    fill={cfg.bg} stroke={cfg.color} strokeWidth={1.5} strokeOpacity={0.6}
+                    filter="url(#shadow)"
+                  />
+                  <text x={tp.x} y={tp.y - 6} textAnchor="middle"
+                    fontSize={11} fontWeight="700" fill={cfg.color}
+                    fontFamily="ui-sans-serif,system-ui,sans-serif">
+                    {cfg.label}
+                  </text>
+                  <text x={tp.x} y={tp.y + 10} textAnchor="middle"
+                    fontSize={9.5} fill={cfg.color} fillOpacity={0.7}
+                    fontFamily="ui-sans-serif,system-ui,sans-serif">
+                    ✦ {cnt}
+                  </text>
+                </g>
               )
             })}
-          </div>
 
-          {/* Legend */}
-          <div className="flex items-center justify-center gap-5 mt-8">
-            {[
-              { color: '#9ca3af', label: 'Low activity' },
-              { color: '#F97316', label: 'Medium' },
-              { color: '#EF4444', label: 'High' },
-            ].map(({ color, label }) => (
-              <div key={label} className="flex items-center gap-1.5">
-                <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: color }} />
-                <span className="text-gray-400 text-xs">{label}</span>
-              </div>
-            ))}
-          </div>
+            {/* ── Competitor nodes ── */}
+            {competitors.map((c, ci) => {
+              const cp = cPos.get(c.id)
+              if (!cp) return null
+              const isHov  = hovered === c.id
+              const isVis  = vis(c)
+              const hasErr = imgErrors.has(c.id)
+              const logo   = hasErr ? null : getLogoUrl(c.website)
+              const init   = (c.name[0] ?? '?').toUpperCase()
+              const d      = dot(c.activity_count ?? 0)
+
+              return (
+                <g key={c.id}
+                  transform={`translate(${cp.x} ${cp.y})`}
+                  opacity={isVis ? 1 : 0.07}
+                  className="sm-fade"
+                  style={{ cursor: isVis ? 'pointer' : 'default', animationDelay: `${100 + ci * 35}ms` }}
+                  onClick={() => isVis && setSelected(c)}
+                  onMouseEnter={() => setHovered(c.id)}
+                  onMouseLeave={() => setHovered(null)}
+                >
+                  {/* glow on hover */}
+                  {isHov && <circle r={NODE_R + 8} fill="#6366f1" fillOpacity={0.1} />}
+
+                  {/* logo circle */}
+                  <circle r={NODE_R} fill="white"
+                    stroke={isHov ? '#6366f1' : '#e5e7eb'}
+                    strokeWidth={isHov ? 2 : 1.5}
+                    filter="url(#shadow)"
+                  />
+
+                  {logo ? (
+                    <image href={logo}
+                      x={-(NODE_R - 4)} y={-(NODE_R - 4)}
+                      width={(NODE_R - 4) * 2} height={(NODE_R - 4) * 2}
+                      clipPath={`url(#cl-${c.id})`}
+                      preserveAspectRatio="xMidYMid meet"
+                      onError={() => setImgErrors(p => { const s = new Set(p); s.add(c.id); return s })}
+                    />
+                  ) : (
+                    <text textAnchor="middle" dominantBaseline="central"
+                      fontSize={12} fontWeight="700" fill="#374151"
+                      fontFamily="ui-sans-serif,system-ui,sans-serif">
+                      {init}
+                    </text>
+                  )}
+
+                  {/* activity dot */}
+                  <circle cx={NODE_R * 0.7} cy={-NODE_R * 0.7} r={6} fill="white" />
+                  <circle cx={NODE_R * 0.7} cy={-NODE_R * 0.7} r={4.5} fill={d} />
+
+                  {/* name */}
+                  <text y={NODE_R + 14} textAnchor="middle"
+                    fontSize={10} fontWeight={isHov ? '700' : '500'}
+                    fill={isHov ? '#111827' : '#6b7280'}
+                    fontFamily="ui-sans-serif,system-ui,sans-serif">
+                    {c.name}
+                  </text>
+                </g>
+              )
+            })}
+          </g>
+        </svg>
+
+        {/* badge */}
+        <div className="absolute top-4 right-4 bg-white/90 border border-gray-200 rounded-full px-3 py-1.5 shadow-sm pointer-events-none">
+          <span className="text-gray-500 text-xs font-medium">✦ {themes.length} major themes detected</span>
+        </div>
+
+        {/* zoom controls */}
+        <div className="absolute bottom-4 left-4 bg-white border border-gray-200 rounded-xl shadow-sm flex items-center divide-x divide-gray-100 overflow-hidden">
+          <button onClick={() => setZoom(z => Math.max(+(z - 0.2).toFixed(1), 0.4))}
+            className="w-8 h-8 flex items-center justify-center text-gray-500 hover:bg-gray-50 text-sm font-medium">−</button>
+          <button onClick={() => setZoom(1)}
+            className="h-8 px-2.5 flex items-center justify-center text-gray-400 hover:bg-gray-50">
+            <span className="text-[10px] font-medium tabular-nums">{Math.round(zoom * 100)}%</span>
+          </button>
+          <button onClick={() => setZoom(z => Math.min(+(z + 0.2).toFixed(1), 2.0))}
+            className="w-8 h-8 flex items-center justify-center text-gray-500 hover:bg-gray-50 text-sm font-medium">+</button>
+        </div>
+
+        {/* legend */}
+        <div className="absolute bottom-4 right-4 bg-white border border-gray-200 rounded-xl p-3 shadow-sm">
+          <p className="text-gray-400 text-[9px] font-semibold uppercase tracking-wider mb-2">Activity (7d)</p>
+          {[['#d1d5db','No signals'],['#f97316','1–2 signals'],['#ef4444','3+ signals']].map(([color, label]) => (
+            <div key={label} className="flex items-center gap-2 mb-1 last:mb-0">
+              <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: color }} />
+              <span className="text-gray-500 text-xs">{label}</span>
+            </div>
+          ))}
         </div>
       </div>
 
-      <CompetitorDrawer
-        competitor={selected}
-        open={selected !== null}
-        onClose={() => setSelected(null)}
-      />
+      <CompetitorDrawer competitor={selected} open={selected !== null} onClose={() => setSelected(null)} />
     </div>
   )
 }
