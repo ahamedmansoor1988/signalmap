@@ -5,9 +5,10 @@ import { Sheet, SheetContent } from '@/components/ui/sheet'
 import { Separator } from '@/components/ui/separator'
 import {
   ExternalLink, TrendingUp, AlertCircle, Zap,
-  RefreshCw, Info, DollarSign, MessageSquare, ArrowRight,
+  RefreshCw, Info, DollarSign, MessageSquare, ArrowRight, Clock,
 } from 'lucide-react'
-import type { MockCompetitor } from './mock-data'
+import Link from 'next/link'
+import type { MockCompetitor, Theme } from './mock-data'
 import { THEME_CONFIG } from './mock-data'
 import { getTypeStyle } from '@/lib/typed-actions'
 import type { TypedAction } from '@/lib/typed-actions'
@@ -16,6 +17,24 @@ import CompetitorLogo from '@/components/ui/competitor-logo'
 interface Insights {
   summary: string
   suggested_actions: TypedAction[]
+}
+
+interface ActivityItem {
+  id: string
+  ai_signal: string | null
+  theme: string | null
+  detected_at: string
+}
+
+function timeAgo(date: string): string {
+  const diff = Date.now() - new Date(date).getTime()
+  const d = Math.floor(diff / 86400000)
+  const h = Math.floor(diff / 3600000)
+  const m = Math.floor(diff / 60000)
+  if (d > 0) return `${d}d ago`
+  if (h > 0) return `${h}h ago`
+  if (m > 0) return `${m}m ago`
+  return 'just now'
 }
 
 interface ScanPage {
@@ -59,6 +78,8 @@ export default function CompetitorDrawer({ competitor, open, onClose }: {
   const [scanPages, setScanPages] = useState<ScanPage[] | null>(null)
   const [scanning, setScanning] = useState(false)
   const [scanError, setScanError] = useState<string | null>(null)
+  const [activity, setActivity] = useState<ActivityItem[]>([])
+  const [loadingActivity, setLoadingActivity] = useState(false)
 
   const isReal = competitor ? isRealId(competitor.id) : false
 
@@ -89,10 +110,22 @@ export default function CompetitorDrawer({ competitor, open, onClose }: {
       .finally(() => setLoadingInsights(false))
   }, [open, competitor?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Reset scan when switching competitors
+  // Fetch recent activity when drawer opens for a real competitor
+  useEffect(() => {
+    if (!open || !competitor || !isReal) { setActivity([]); return }
+    setLoadingActivity(true)
+    fetch(`/api/competitor/${competitor.id}/activity`)
+      .then(r => r.json())
+      .then((data: { activity: ActivityItem[] }) => setActivity(data.activity ?? []))
+      .catch(() => {})
+      .finally(() => setLoadingActivity(false))
+  }, [open, competitor?.id]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Reset scan + activity when switching competitors
   useEffect(() => {
     setScanPages(null)
     setScanError(null)
+    setActivity([])
   }, [competitor?.id])
 
   const handleScan = useCallback(async () => {
@@ -156,13 +189,80 @@ export default function CompetitorDrawer({ competitor, open, onClose }: {
             <span className="text-gray-300 text-xs">·</span>
             <span className="text-gray-400 text-xs">
               {competitor.signals_count > 0
-                ? `${competitor.signals_count} signals this month`
-                : 'Monitoring active'}
+                ? `${competitor.signals_count} signals detected`
+                : 'No signals yet'}
             </span>
           </div>
         </div>
 
         <Separator className="bg-gray-200" />
+
+        {/* Recent Activity — real competitors only */}
+        {isReal && (
+          <>
+            <div className="px-6 py-4">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <Zap className="w-4 h-4 text-amber-500" />
+                  <span className="text-gray-700 text-sm font-medium">Recent Activity</span>
+                </div>
+                <Link
+                  href={`/changes`}
+                  className="text-xs text-violet-600 hover:text-violet-700 transition-colors"
+                >
+                  View all →
+                </Link>
+              </div>
+
+              {loadingActivity && (
+                <div className="space-y-2">
+                  <Skeleton className="h-14 w-full" />
+                  <Skeleton className="h-14 w-full" />
+                </div>
+              )}
+
+              {!loadingActivity && activity.length === 0 && (
+                <p className="text-gray-400 text-xs leading-snug">
+                  No signals detected yet — the cron job runs daily at 8am UTC.
+                </p>
+              )}
+
+              {!loadingActivity && activity.length > 0 && (
+                <div className="space-y-2">
+                  {activity.map(item => {
+                    const themeCfg = item.theme ? THEME_CONFIG[item.theme as Theme] : null
+                    return (
+                      <Link
+                        key={item.id}
+                        href={`/changes/${item.id}`}
+                        className="block bg-gray-50 border border-gray-100 rounded-xl p-3 hover:border-gray-200 hover:shadow-sm transition-all group"
+                      >
+                        <div className="flex items-center gap-2 mb-1.5">
+                          {themeCfg ? (
+                            <span
+                              className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full shrink-0"
+                              style={{ backgroundColor: themeCfg.bg, color: themeCfg.color }}
+                            >
+                              {item.theme}
+                            </span>
+                          ) : null}
+                          <span className="flex items-center gap-1 text-gray-400 text-xs ml-auto shrink-0">
+                            <Clock className="w-3 h-3" />
+                            {timeAgo(item.detected_at)}
+                          </span>
+                        </div>
+                        <p className="text-gray-700 text-xs leading-snug line-clamp-2 group-hover:text-gray-900 transition-colors">
+                          {item.ai_signal ?? 'Change detected'}
+                        </p>
+                      </Link>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+            <Separator className="bg-gray-200" />
+          </>
+        )}
 
         {/* Live Scan — real competitors only */}
         {isReal && (
@@ -237,8 +337,8 @@ export default function CompetitorDrawer({ competitor, open, onClose }: {
           </>
         )}
 
-        {/* Latest Signal — only when real signals exist, or for mock data */}
-        {(!isReal || competitor.signals_count > 0) && (
+        {/* Latest Signal — mock data only (real competitors use Recent Activity above) */}
+        {!isReal && (
           <>
             <div className="p-6">
               <div className="flex items-center gap-2 mb-3">
