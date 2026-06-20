@@ -6,6 +6,8 @@ import { THEME_CONFIG } from '@/components/map/mock-data'
 import type { Theme } from '@/components/map/mock-data'
 import type { Database } from '@/lib/supabase/types'
 import { normalizeActions, getTypeStyle } from '@/lib/typed-actions'
+import type { StructuredDiff } from '@/lib/extractor'
+import StructuredDiffView from '@/components/changes/structured-diff-view'
 
 type Change = Database['public']['Tables']['changes']['Row'] & {
   tracked_pages: {
@@ -27,7 +29,7 @@ function timeAgo(date: string): string {
   return 'just now'
 }
 
-export default function ChangeCard({ change }: { change: Change }) {
+export default function ChangeCard({ change, structuredDiff }: { change: Change; structuredDiff?: StructuredDiff | null }) {
   const [expanded, setExpanded] = useState(false)
   const [seen, setSeen] = useState(!!change.seen_at)
   const [markingAsSeen, setMarkingAsSeen] = useState(false)
@@ -127,6 +129,8 @@ export default function ChangeCard({ change }: { change: Change }) {
       {/* Expanded detail — inline, no navigation required */}
       {expanded && (
         <div className="px-4 pb-4 border-t border-gray-100 pt-4 space-y-4">
+          {structuredDiff && <StructuredDiffView diff={structuredDiff} />}
+
           {impactBullets.length > 0 && (
             <div>
               <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Impact</p>

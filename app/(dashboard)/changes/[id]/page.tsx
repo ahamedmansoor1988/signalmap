@@ -2,9 +2,12 @@ import { createClient } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
 import { THEME_CONFIG } from '@/components/map/mock-data'
 import type { Theme } from '@/components/map/mock-data'
-import { ArrowLeft, ExternalLink, AlertCircle, Zap, TrendingUp } from 'lucide-react'
+import { ArrowLeft, ExternalLink, AlertCircle, Zap, TrendingUp, GitCompare } from 'lucide-react'
 import Link from 'next/link'
 import { normalizeActions, getTypeStyle } from '@/lib/typed-actions'
+import { diffParsedPages } from '@/lib/extractor'
+import type { ParsedPage } from '@/lib/extractor'
+import StructuredDiffView from '@/components/changes/structured-diff-view'
 
 export default async function ChangeDetailPage({ params }: { params: { id: string } }) {
   const supabase = await createClient()
@@ -18,6 +21,22 @@ export default async function ChangeDetailPage({ params }: { params: { id: strin
     .single()
 
   if (!change) notFound()
+
+  // Fetch structured before/after from competitor_diffs (same page, within 10 min of change)
+  const changeTs = new Date(change.detected_at).getTime()
+  const since = new Date(changeTs - 10 * 60 * 1000).toISOString()
+  const until = new Date(changeTs + 10 * 60 * 1000).toISOString()
+  const { data: diffRow } = await supabase
+    .from('competitor_diffs')
+    .select('old_value, new_value')
+    .eq('tracked_page_id', change.tracked_page_id)
+    .gte('detected_at', since)
+    .lte('detected_at', until)
+    .maybeSingle()
+
+  const structuredDiff = diffRow?.old_value && diffRow?.new_value
+    ? diffParsedPages(diffRow.old_value as unknown as ParsedPage, diffRow.new_value as unknown as ParsedPage)
+    : null
 
   const theme = change.theme as Theme | null
   const cfg = theme && THEME_CONFIG[theme] ? THEME_CONFIG[theme] : null
@@ -93,6 +112,17 @@ export default async function ChangeDetailPage({ params }: { params: { id: strin
                 <span className="text-gray-700 text-sm font-medium">What it means</span>
               </div>
               <p className="text-gray-600 text-sm leading-relaxed">{change.ai_summary}</p>
+            </div>
+          )}
+
+          {/* Structured Diff */}
+          {structuredDiff && (
+            <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
+              <div className="flex items-center gap-2 mb-3">
+                <GitCompare className="w-4 h-4 text-gray-400" />
+                <span className="text-gray-700 text-sm font-medium">Structured Changes</span>
+              </div>
+              <StructuredDiffView diff={structuredDiff} />
             </div>
           )}
 

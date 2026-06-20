@@ -4,6 +4,7 @@ import { useState, useMemo } from 'react'
 import { GitCompare } from 'lucide-react'
 import ChangeCard from '@/components/changes/change-card'
 import type { Database } from '@/lib/supabase/types'
+import type { StructuredDiff } from '@/lib/extractor'
 
 type Change = Database['public']['Tables']['changes']['Row'] & {
   tracked_pages: {
@@ -14,6 +15,7 @@ type Change = Database['public']['Tables']['changes']['Row'] & {
       name: string
     }
   }
+  structured_diff?: unknown
 }
 
 export default function ChangesClient({ changes }: { changes: Change[] }) {
@@ -121,7 +123,13 @@ export default function ChangesClient({ changes }: { changes: Change[] }) {
         </div>
       ) : (
         <div className="space-y-3">
-          {filtered.map((c) => <ChangeCard key={c.id} change={c} />)}
+          {filtered.map((c) => (
+            <ChangeCard
+              key={c.id}
+              change={c}
+              structuredDiff={c.structured_diff as StructuredDiff | null}
+            />
+          ))}
         </div>
       )}
     </div>

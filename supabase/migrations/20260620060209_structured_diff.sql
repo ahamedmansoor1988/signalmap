@@ -1,0 +1,1 @@
+ALTER TABLE changes ADD COLUMN IF NOT EXISTS structured_diff JSONB;

@@ -123,7 +123,7 @@ export async function GET(req: NextRequest) {
 
       if (!prevSnap?.text_content) {
         // First snapshot — store structured extraction as baseline, no diff yet
-        const parsed = await extractPageData(page.url, crawled.text)
+        const parsed = await extractPageData(page.url, crawled.text, crawled.html)
         await supabase
           .from('competitor_snapshots')
           .upsert({
@@ -149,7 +149,7 @@ export async function GET(req: NextRequest) {
           .maybeSingle()
 
         if (!existingSnapshot) {
-          const parsed = await extractPageData(page.url, crawled.text)
+          const parsed = await extractPageData(page.url, crawled.text, crawled.html)
           await supabase
             .from('competitor_snapshots')
             .upsert({
@@ -167,7 +167,7 @@ export async function GET(req: NextRequest) {
       }
 
       // 3. Changes detected — extract structured data + compare with yesterday
-      const parsed = await extractPageData(page.url, crawled.text)
+      const parsed = await extractPageData(page.url, crawled.text, crawled.html)
       await supabase
         .from('competitor_snapshots')
         .upsert({
@@ -203,8 +203,8 @@ export async function GET(req: NextRequest) {
             tracked_page_id: page.id,
             change_type: changeTypeFromPageType(parsed.page_type),
             summary: summaryLines || parsed.summary,
-            old_value: { key_items: (prevSnapshot.parsed_data as unknown as typeof parsed).key_items },
-            new_value: { key_items: parsed.key_items },
+            old_value: prevSnapshot.parsed_data,            // full ParsedPage
+            new_value: parsed as unknown as import('@/lib/supabase/types').Json, // full ParsedPage
           })
         }
       }

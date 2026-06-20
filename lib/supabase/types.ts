@@ -272,6 +272,7 @@ export interface Database {
           theme: string | null
           impact_bullets: Json | null
           suggested_actions: Json | null
+          structured_diff: Json | null
           detected_at: string
           seen_at: string | null
         }
@@ -288,6 +289,7 @@ export interface Database {
           theme?: string | null
           impact_bullets?: Json | null
           suggested_actions?: Json | null
+          structured_diff?: Json | null
           detected_at?: string
           seen_at?: string | null
         }
@@ -304,6 +306,7 @@ export interface Database {
           theme?: string | null
           impact_bullets?: Json | null
           suggested_actions?: Json | null
+          structured_diff?: Json | null
           detected_at?: string
           seen_at?: string | null
         }
