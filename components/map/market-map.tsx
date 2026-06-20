@@ -74,12 +74,6 @@ function computeLayout(competitors: MapCompetitor[]) {
     const Nc = group.length
     if (!Nc) continue
 
-    // Radial and perpendicular unit vectors from theme center
-    const rx = Math.cos(tp.angle)
-    const ry = Math.sin(tp.angle)
-    const px = -Math.sin(tp.angle)
-    const py =  Math.cos(tp.angle)
-
     // Orbit competitors evenly around their theme card in a full circle
     const ORBIT_R = 110  // radius of the orbit ring around theme center
     // Start angle offset so competitors don't overlap center<->origin line
