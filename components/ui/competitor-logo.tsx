@@ -1,6 +1,5 @@
 'use client'
 
-import Image from 'next/image'
 import { useState } from 'react'
 import { getLogoUrl } from '@/lib/get-logo-url'
 
@@ -44,12 +43,12 @@ export default function CompetitorLogo({ website, name, size = 'md', className =
 
   return (
     <div className={`${base} bg-white border border-gray-100`} style={dim}>
-      <Image
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
         src={logoUrl}
         alt={name}
         width={px}
         height={px}
-        unoptimized
         onError={() => setFailed(true)}
         className="object-contain w-full h-full p-[2px]"
       />
