@@ -31,16 +31,16 @@ interface Props {
 }
 
 // ─── Layout constants ──────────────────────────────────────────
-const SVG_W    = 1100
-const SVG_H    = 780
-const CX       = SVG_W / 2   // 550
-const CY       = SVG_H / 2   // 390
-const THEME_R  = 165          // center → theme-card center
-const COMP_R   = 138          // theme-card center → competitor-node center
-const NODE_R   = 21           // competitor circle radius
+const SVG_W    = 1200
+const SVG_H    = 860
+const CX       = SVG_W / 2   // 600
+const CY       = SVG_H / 2   // 430
+const THEME_R  = 160          // center → theme-card center
+const NODE_R   = 20           // competitor circle radius (40px diameter)
 const THEME_W  = 118          // theme card width
 const THEME_H  = 50           // theme card height
 const THEME_RX = 10           // card corner radius
+// Single-arc and 2-row layout distances (defined in computeLayout below)
 
 // Deterministic avatar colour
 const AVATAR_COLORS = ['#6366f1','#8b5cf6','#06b6d4','#10b981','#f59e0b','#ef4444','#ec4899','#3b82f6']
@@ -79,16 +79,47 @@ function computeLayout(competitors: MapCompetitor[]) {
     const group = competitors.filter(c => c.theme === theme)
     const Nc = group.length
     if (!Nc) continue
-    // Fan spread: 25° per competitor, capped at 70°
-    const spread = Math.min((Nc - 1) * 0.436, 1.222) // radians
-    const step   = Nc > 1 ? spread / (Nc - 1) : 0
-    group.forEach((comp, i) => {
-      const a = tp.angle - spread / 2 + i * step
-      compPos.set(comp.id, {
-        x: tp.x + COMP_R * Math.cos(a),
-        y: tp.y + COMP_R * Math.sin(a),
+
+    // Radial and perpendicular unit vectors from theme center
+    const rx = Math.cos(tp.angle)
+    const ry = Math.sin(tp.angle)
+    const px = -Math.sin(tp.angle)
+    const py =  Math.cos(tp.angle)
+
+    if (Nc <= 4) {
+      // Single arc: fan up to 70° around the radial direction
+      const ARC_R  = 185
+      const spread = Math.min((Nc - 1) * 0.44, 1.22) // max ~70°
+      const step   = Nc > 1 ? spread / (Nc - 1) : 0
+      group.forEach((comp, i) => {
+        const a = tp.angle - spread / 2 + i * step
+        compPos.set(comp.id, {
+          x: tp.x + ARC_R * Math.cos(a),
+          y: tp.y + ARC_R * Math.sin(a),
+        })
       })
-    })
+    } else {
+      // 2-row grid: row 1 closer to theme, row 2 farther out
+      const ROW1   = 175   // radial distance to row 1
+      const ROW2   = 240   // radial distance to row 2
+      const SPACING = 52   // lateral gap between nodes (NODE_R*2 + 12px clearance)
+      const N1 = Math.ceil(Nc / 2)
+      const N2 = Nc - N1
+      for (let i = 0; i < N1; i++) {
+        const lat = (i - (N1 - 1) / 2) * SPACING
+        compPos.set(group[i].id, {
+          x: tp.x + ROW1 * rx + lat * px,
+          y: tp.y + ROW1 * ry + lat * py,
+        })
+      }
+      for (let i = 0; i < N2; i++) {
+        const lat = (i - (N2 - 1) / 2) * SPACING
+        compPos.set(group[N1 + i].id, {
+          x: tp.x + ROW2 * rx + lat * px,
+          y: tp.y + ROW2 * ry + lat * py,
+        })
+      }
+    }
   }
 
   return { themePos, compPos, activeThemes }
@@ -205,7 +236,7 @@ export default function MarketMap({ competitors, isLiveData }: Props) {
                       x2={cp.x} y2={cp.y}
                       stroke={cfg.color}
                       strokeWidth={1.5}
-                      strokeOpacity={visible(c) ? 0.28 : 0.05}
+                      strokeOpacity={visible(c) ? 0.45 : 0.05}
                       strokeDasharray="4 3"
                     />
                   )
