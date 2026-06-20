@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 import { THEME_CONFIG, type Theme } from './mock-data'
 import CompetitorDrawer from './competitor-drawer'
 import { Search, Plus, Calendar, ChevronDown, Database } from 'lucide-react'
@@ -85,16 +85,87 @@ export default function MarketMap({ competitors, isLiveData }: Props) {
   const [selected,  setSelected]  = useState<MapCompetitor | null>(null)
   const [hovered,   setHovered]   = useState<string | null>(null)
   const [search,    setSearch]    = useState('')
-  const [zoom,      setZoom]      = useState(1)
   const [imgErrors, setImgErrors] = useState<Set<string>>(new Set())
+
+  // Pan + zoom state
+  const [zoom,   setZoom]   = useState(0.75)
+  const [pan,    setPan]    = useState({ x: 0, y: 0 })
+  const dragging = useRef(false)
+  const dragStart = useRef({ mx: 0, my: 0, px: 0, py: 0 })
+  const svgRef = useRef<SVGSVGElement>(null)
 
   const { tPos, cPos, themes } = layout(competitors)
   const q = search.toLowerCase()
   const vis = (c: MapCompetitor) =>
     !q || c.name.toLowerCase().includes(q) || c.theme.toLowerCase().includes(q)
 
-  const tx = CX * (1 - zoom)
-  const ty = CY * (1 - zoom)
+  // Zoom toward cursor point
+  const handleWheel = useCallback((e: WheelEvent) => {
+    e.preventDefault()
+    const rect = svgRef.current?.getBoundingClientRect()
+    if (!rect) return
+
+    // trackpad pinch = ctrlKey, two-finger scroll = no ctrlKey
+    const delta = e.ctrlKey ? -e.deltaY * 0.01 : -e.deltaY * 0.002
+    const factor = Math.exp(delta)
+
+    // cursor in container coords
+    const mx = e.clientX - rect.left
+    const my = e.clientY - rect.top
+
+    setZoom(z => {
+      const next = Math.min(Math.max(z * factor, 0.25), 3)
+      const ratio = next / z
+      setPan(p => ({
+        x: mx - ratio * (mx - p.x),
+        y: my - ratio * (my - p.y),
+      }))
+      return next
+    })
+  }, [])
+
+  useEffect(() => {
+    const el = svgRef.current
+    if (!el) return
+    el.addEventListener('wheel', handleWheel, { passive: false })
+    return () => el.removeEventListener('wheel', handleWheel)
+  }, [handleWheel])
+
+  const onPointerDown = useCallback((e: React.PointerEvent<SVGSVGElement>) => {
+    // Only drag on background (not on competitor nodes / theme cards)
+    if ((e.target as SVGElement).closest('[data-interactive]')) return
+    e.currentTarget.setPointerCapture(e.pointerId)
+    dragging.current = true
+    dragStart.current = { mx: e.clientX, my: e.clientY, px: pan.x, py: pan.y }
+  }, [pan])
+
+  const onPointerMove = useCallback((e: React.PointerEvent<SVGSVGElement>) => {
+    if (!dragging.current) return
+    setPan({
+      x: dragStart.current.px + e.clientX - dragStart.current.mx,
+      y: dragStart.current.py + e.clientY - dragStart.current.my,
+    })
+  }, [])
+
+  const onPointerUp = useCallback(() => { dragging.current = false }, [])
+
+  // Transform: pan then scale around origin
+  // We want the SVG content to scale around the center, with pan offset.
+  // The group transform is: translate(pan.x, pan.y) scale(zoom) translate(-CX, -CY)
+  // This makes CX,CY the "pivot" point that stays centered at initial zoom.
+  const zoomIn  = () => setZoom(z => {
+    const next = Math.min(+(z + 0.15).toFixed(2), 3)
+    const ratio = next / z
+    setPan(p => ({ x: p.x + (p.x - 0) * (ratio - 1), y: p.y + (p.y - 0) * (ratio - 1) }))
+    return next
+  })
+  const zoomOut = () => setZoom(z => {
+    const next = Math.max(+(z - 0.15).toFixed(2), 0.25)
+    const ratio = next / z
+    setPan(p => ({ x: p.x + (p.x - 0) * (ratio - 1), y: p.y + (p.y - 0) * (ratio - 1) }))
+    return next
+  })
+  const resetView = () => { setZoom(0.75); setPan({ x: 0, y: 0 }) }
 
   return (
     <div className="flex flex-col h-full" style={{ background: '#f8f9fb' }}>
@@ -133,7 +204,17 @@ export default function MarketMap({ competitors, isLiveData }: Props) {
 
       {/* ── Canvas ── */}
       <div className="flex-1 relative overflow-hidden">
-        <svg width="100%" height="100%" viewBox={`0 0 ${W} ${H}`} className="absolute inset-0">
+        <svg
+          ref={svgRef}
+          width="100%" height="100%"
+          viewBox={`0 0 ${W} ${H}`}
+          className="absolute inset-0"
+          style={{ cursor: dragging.current ? 'grabbing' : 'grab' }}
+          onPointerDown={onPointerDown}
+          onPointerMove={onPointerMove}
+          onPointerUp={onPointerUp}
+          onPointerLeave={onPointerUp}
+        >
 
           {/* clip paths for favicons */}
           <defs>
@@ -148,8 +229,8 @@ export default function MarketMap({ competitors, isLiveData }: Props) {
           </defs>
 
 
-          {/* ── Zoom group ── */}
-          <g transform={`translate(${tx} ${ty}) scale(${zoom})`}>
+          {/* ── Pan + Zoom group ── */}
+          <g transform={`translate(${pan.x + W/2 * (1 - zoom)} ${pan.y + H/2 * (1 - zoom)}) scale(${zoom})`}>
 
             {/* ── Center anchor ── */}
             <circle cx={CX} cy={CY} r={6} fill="#e5e7eb" />
@@ -260,6 +341,7 @@ export default function MarketMap({ competitors, isLiveData }: Props) {
 
               return (
                 <g key={c.id}
+                  data-interactive="true"
                   transform={`translate(${cp.x} ${cp.y})`}
                   opacity={isVis ? 1 : 0.07}
                   className="sm-fade"
@@ -337,13 +419,14 @@ export default function MarketMap({ competitors, isLiveData }: Props) {
 
         {/* zoom controls */}
         <div className="absolute bottom-4 left-4 bg-white border border-gray-200 rounded-xl shadow-sm flex items-center divide-x divide-gray-100 overflow-hidden">
-          <button onClick={() => setZoom(z => Math.max(+(z - 0.2).toFixed(1), 0.4))}
+          <button onClick={zoomOut}
             className="w-8 h-8 flex items-center justify-center text-gray-500 hover:bg-gray-50 text-sm font-medium">−</button>
-          <button onClick={() => setZoom(1)}
-            className="h-8 px-2.5 flex items-center justify-center text-gray-400 hover:bg-gray-50">
+          <button onClick={resetView}
+            className="h-8 px-2.5 flex items-center justify-center text-gray-400 hover:bg-gray-50"
+            title="Reset view">
             <span className="text-[10px] font-medium tabular-nums">{Math.round(zoom * 100)}%</span>
           </button>
-          <button onClick={() => setZoom(z => Math.min(+(z + 0.2).toFixed(1), 2.0))}
+          <button onClick={zoomIn}
             className="w-8 h-8 flex items-center justify-center text-gray-500 hover:bg-gray-50 text-sm font-medium">+</button>
         </div>
 
