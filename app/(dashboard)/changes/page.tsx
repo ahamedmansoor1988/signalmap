@@ -31,7 +31,7 @@ export default async function ChangesPage() {
       *,
       tracked_pages(
         url, label,
-        competitors!inner(id, name, org_id)
+        competitors!inner(id, name, org_id, website)
       )
     `)
     .eq('tracked_pages.competitors.org_id', membership.org_id)

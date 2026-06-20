@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import { Trash2, ExternalLink, Globe } from 'lucide-react'
 import type { Database } from '@/lib/supabase/types'
+import CompetitorLogo from '@/components/ui/competitor-logo'
 
 type Competitor = Database['public']['Tables']['competitors']['Row'] & {
   tracked_pages: Array<Database['public']['Tables']['tracked_pages']['Row']>
@@ -58,7 +59,9 @@ export default function CompetitorList({ competitors }: Props) {
           key={c.id}
           className="bg-white border border-gray-200 rounded-xl p-4 flex items-start justify-between group shadow-sm"
         >
-          <div className="flex-1 min-w-0">
+          <div className="flex items-start gap-3 flex-1 min-w-0">
+            <CompetitorLogo website={c.website} name={c.name} size="md" className="mt-0.5" />
+            <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1">
               <span className="text-gray-900 font-medium text-sm">{c.name}</span>
               <RiskBadge score={c.risk_score} />
@@ -84,7 +87,8 @@ export default function CompetitorList({ competitors }: Props) {
                 ))}
               </div>
             )}
-          </div>
+            </div>{/* end inner text block */}
+          </div>{/* end logo+text flex */}
           <button
             onClick={() => handleDelete(c.id)}
             disabled={deleting === c.id}

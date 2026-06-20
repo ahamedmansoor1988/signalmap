@@ -11,6 +11,7 @@ import type { MockCompetitor } from './mock-data'
 import { THEME_CONFIG } from './mock-data'
 import { getTypeStyle } from '@/lib/typed-actions'
 import type { TypedAction } from '@/lib/typed-actions'
+import CompetitorLogo from '@/components/ui/competitor-logo'
 
 interface Insights {
   summary: string
@@ -128,17 +129,20 @@ export default function CompetitorDrawer({ competitor, open, onClose }: {
         {/* Header */}
         <div className="p-6 pb-4">
           <div className="flex items-start justify-between mb-4">
-            <div>
-              <h2 className="text-gray-900 text-xl font-semibold">{competitor.name}</h2>
-              <a
-                href={`https://${competitor.website}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-gray-400 text-sm hover:text-gray-600 flex items-center gap-1 mt-0.5 transition-colors"
-              >
-                {competitor.website}
-                <ExternalLink className="w-3 h-3" />
-              </a>
+            <div className="flex items-start gap-3">
+              <CompetitorLogo website={competitor.website} name={competitor.name} size="lg" />
+              <div>
+                <h2 className="text-gray-900 text-xl font-semibold">{competitor.name}</h2>
+                <a
+                  href={competitor.website.startsWith('http') ? competitor.website : `https://${competitor.website}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-gray-400 text-sm hover:text-gray-600 flex items-center gap-1 mt-0.5 transition-colors"
+                >
+                  {competitor.website.replace(/^https?:\/\//, '')}
+                  <ExternalLink className="w-3 h-3" />
+                </a>
+              </div>
             </div>
             <RiskBadge score={competitor.risk_score} />
           </div>

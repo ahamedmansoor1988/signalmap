@@ -8,6 +8,7 @@ import type { Database } from '@/lib/supabase/types'
 import { normalizeActions, getTypeStyle } from '@/lib/typed-actions'
 import type { StructuredDiff } from '@/lib/extractor'
 import StructuredDiffView from '@/components/changes/structured-diff-view'
+import CompetitorLogo from '@/components/ui/competitor-logo'
 
 type Change = Database['public']['Tables']['changes']['Row'] & {
   tracked_pages: {
@@ -16,6 +17,7 @@ type Change = Database['public']['Tables']['changes']['Row'] & {
     competitors: {
       id: string
       name: string
+      website: string
     }
   }
 }
@@ -64,6 +66,11 @@ export default function ChangeCard({ change, structuredDiff }: { change: Change;
         <div className="flex items-start justify-between gap-3">
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-2 flex-wrap">
+              <CompetitorLogo
+                website={change.tracked_pages.competitors.website}
+                name={change.tracked_pages.competitors.name}
+                size="sm"
+              />
               <span className="text-gray-900 font-medium text-sm">
                 {change.tracked_pages.competitors.name}
               </span>

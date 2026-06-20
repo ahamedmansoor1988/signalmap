@@ -8,6 +8,7 @@ import { normalizeActions, getTypeStyle } from '@/lib/typed-actions'
 import { diffParsedPages } from '@/lib/extractor'
 import type { ParsedPage } from '@/lib/extractor'
 import StructuredDiffView from '@/components/changes/structured-diff-view'
+import CompetitorLogo from '@/components/ui/competitor-logo'
 
 export default async function ChangeDetailPage({ params }: { params: { id: string } }) {
   const supabase = await createClient()
@@ -61,7 +62,10 @@ export default async function ChangeDetailPage({ params }: { params: { id: strin
 
         {/* Header */}
         <div className="mb-6">
-          <div className="flex items-center gap-2 mb-2">
+          <div className="flex items-center gap-3 mb-2">
+            {competitor?.name && (
+              <CompetitorLogo website={competitor.website} name={competitor.name} size="lg" />
+            )}
             <h1 className="text-gray-900 text-xl font-semibold">{competitor?.name}</h1>
             {cfg && (
               <span

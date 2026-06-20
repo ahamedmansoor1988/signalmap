@@ -13,6 +13,7 @@ type Change = Database['public']['Tables']['changes']['Row'] & {
     competitors: {
       id: string
       name: string
+      website: string
     }
   }
   structured_diff?: unknown

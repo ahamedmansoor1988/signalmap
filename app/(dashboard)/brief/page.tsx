@@ -4,6 +4,7 @@ import { BarChart3, TrendingUp, Trophy, Zap, ChevronRight } from 'lucide-react'
 import { normalizeActions, getTypeStyle } from '@/lib/typed-actions'
 import type { Json } from '@/lib/supabase/types'
 import type { TopMove } from '@/lib/weekly-brief'
+import CompetitorLogo from '@/components/ui/competitor-logo'
 
 export const metadata = { title: 'Weekly Brief — SignalMap' }
 
@@ -32,12 +33,23 @@ export default async function BriefPage() {
 
   if (!membership) redirect('/onboarding')
 
-  const { data: briefs } = await supabase
-    .from('weekly_briefs')
-    .select('*')
-    .eq('org_id', membership.org_id)
-    .order('week_start', { ascending: false })
-    .limit(10)
+  const [{ data: briefs }, { data: orgCompetitors }] = await Promise.all([
+    supabase
+      .from('weekly_briefs')
+      .select('*')
+      .eq('org_id', membership.org_id)
+      .order('week_start', { ascending: false })
+      .limit(10),
+    supabase
+      .from('competitors')
+      .select('name, website')
+      .eq('org_id', membership.org_id),
+  ])
+
+  const websiteByName: Record<string, string> = {}
+  for (const c of orgCompetitors ?? []) {
+    websiteByName[c.name.toLowerCase()] = c.website
+  }
 
   const latest = briefs?.[0] ?? null
   const previous = briefs?.slice(1) ?? []
@@ -98,9 +110,17 @@ export default async function BriefPage() {
                   {topMoves.map((move, i) => (
                     <div key={i} className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
                       <div className="flex items-start gap-3">
-                        <span className="text-gray-300 text-sm font-bold shrink-0 mt-0.5 w-4">{i + 1}</span>
+                        <CompetitorLogo
+                          website={websiteByName[move.competitor?.toLowerCase() ?? ''] ?? null}
+                          name={move.competitor}
+                          size="sm"
+                          className="mt-0.5"
+                        />
                         <div className="min-w-0">
-                          <span className="text-gray-900 text-sm font-semibold">{move.competitor}</span>
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-gray-300 text-xs font-semibold">{i + 1}</span>
+                            <span className="text-gray-900 text-sm font-semibold">{move.competitor}</span>
+                          </div>
                           <p className="text-gray-600 text-sm mt-0.5 leading-snug">{move.move}</p>
                           <p className="text-gray-400 text-xs mt-1 italic leading-snug">{move.impact}</p>
                         </div>
