@@ -31,7 +31,7 @@ interface Props {
 const W  = 1300
 const H  = 820
 const CX = W / 2
-const CY = H / 2 + 30   // nudge center down so title has room
+const CY = H / 2
 
 // ── Sizes ──────────────────────────────────────────────────────
 const THEME_R  = 240   // ring where theme cards sit
@@ -147,15 +147,6 @@ export default function MarketMap({ competitors, isLiveData }: Props) {
             </filter>
           </defs>
 
-          {/* ── Title (fixed, above zoom group) ── */}
-          <text x={W / 2} y={30} textAnchor="middle" fontSize={12} fontWeight="700"
-            letterSpacing="0.2em" fill="#111827" fontFamily="ui-sans-serif,system-ui,sans-serif">
-            AI MARKET MAP
-          </text>
-          <text x={W / 2} y={48} textAnchor="middle" fontSize={10} fill="#9ca3af"
-            fontFamily="ui-sans-serif,system-ui,sans-serif">
-            Visualize what&apos;s happening in your market
-          </text>
 
           {/* ── Zoom group ── */}
           <g transform={`translate(${tx} ${ty}) scale(${zoom})`}>
