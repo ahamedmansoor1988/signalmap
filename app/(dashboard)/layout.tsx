@@ -5,7 +5,14 @@ import SignalNotifier from '@/components/ui/signal-notifier'
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+
+  let user = null
+  try {
+    const result = await supabase.auth.getUser()
+    user = result.data?.user ?? null
+  } catch {
+    // auth service unavailable — treat as signed out
+  }
 
   if (!user) redirect('/login')
 
