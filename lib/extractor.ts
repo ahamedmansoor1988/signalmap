@@ -208,6 +208,11 @@ export function diffParsedPages(prev: ParsedPage, curr: ParsedPage): StructuredD
 }
 
 function diffPricing(prev: PricingPage, curr: PricingPage): StructuredDiff | null {
+  // Backward compat: old snapshots stored as { key_items, summary } with no plans[]
+  if (!Array.isArray(prev.plans) || !Array.isArray(curr.plans)) {
+    return diffGeneric(prev, curr, 'pricing')
+  }
+
   const plan_changes: PlanChange[] = []
   const added: string[] = []
   const removed: string[] = []
@@ -248,6 +253,11 @@ function diffPricing(prev: PricingPage, curr: PricingPage): StructuredDiff | nul
 }
 
 function diffHomepage(prev: HomepagePage, curr: HomepagePage): StructuredDiff | null {
+  // Backward compat: old snapshots stored as { key_items, summary }
+  if (!prev.hero_headline && !prev.primary_cta) {
+    return diffGeneric(prev, curr, 'homepage')
+  }
+
   const FIELDS: Array<{ key: keyof HomepagePage; label: string }> = [
     { key: 'hero_headline',    label: 'Hero Headline' },
     { key: 'hero_subheadline', label: 'Subheadline' },
@@ -285,6 +295,7 @@ function diffHomepage(prev: HomepagePage, curr: HomepagePage): StructuredDiff | 
 }
 
 function diffBlog(prev: BlogPage, curr: BlogPage): StructuredDiff | null {
+  // If prev had no new_posts (old format), treat all current posts as new
   const prevTitles = new Set((prev.new_posts ?? []).map((p) => p.title.toLowerCase()))
   const newPosts = (curr.new_posts ?? []).filter(
     (p) => !prevTitles.has(p.title.toLowerCase())
