@@ -69,20 +69,23 @@ function computeLayout(competitors: MapCompetitor[]) {
 
   const compPos = new Map<string, CompPos>()
   for (const theme of activeThemes) {
-    const tp = themePos.get(theme)!
+    const tp    = themePos.get(theme)!
     const group = competitors.filter(c => c.theme === theme)
-    const Nc = group.length
+    const Nc    = group.length
     if (!Nc) continue
 
-    // Orbit competitors evenly around their theme card in a full circle
-    const ORBIT_R = 110  // radius of the orbit ring around theme center
-    // Start angle offset so competitors don't overlap center<->origin line
-    const startAngle = tp.angle + Math.PI / 2
+    // Fan competitors outward from the theme in the radial direction
+    // spread ±55° so the cluster stays tight and doesn't bleed into neighbours
+    const FAN_R   = 105          // distance from theme card centre to competitor
+    const SPREAD  = (Math.PI * 110) / 180   // 110° total arc
+    const step    = Nc > 1 ? SPREAD / (Nc - 1) : 0
+    const baseAngle = tp.angle   // outward = same direction as theme from map centre
+
     group.forEach((comp, i) => {
-      const a = startAngle + (i / Nc) * 2 * Math.PI
+      const a = baseAngle - SPREAD / 2 + i * step
       compPos.set(comp.id, {
-        x: tp.x + ORBIT_R * Math.cos(a),
-        y: tp.y + ORBIT_R * Math.sin(a),
+        x: tp.x + FAN_R * Math.cos(a),
+        y: tp.y + FAN_R * Math.sin(a),
       })
     })
   }
@@ -122,6 +125,13 @@ export default function MarketMap({ competitors, isLiveData }: Props) {
 
   return (
     <div className="flex flex-col h-full bg-slate-50">
+      <style>{`
+        @keyframes smFadeUp {
+          from { opacity: 0; transform: translateY(8px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+        .sm-node { animation: smFadeUp 0.45s ease both; }
+      `}</style>
 
       {/* ── Toolbar ── */}
       <div className="flex items-center gap-2 px-4 py-2.5 border-b border-gray-200 bg-white shrink-0 flex-wrap">
@@ -210,14 +220,14 @@ export default function MarketMap({ competitors, isLiveData }: Props) {
             {/* lines removed — competitors orbit theme cards directly */}
 
             {/* ── Theme cards ── */}
-            {activeThemes.map(theme => {
+            {activeThemes.map((theme, ti) => {
               const tp  = themePos.get(theme)!
               const cfg = THEME_CONFIG[theme]
               const count = competitors.filter(c => c.theme === theme).length
               const tx = tp.x - THEME_W / 2
               const ty = tp.y - THEME_H / 2
               return (
-                <g key={theme}>
+                <g key={theme} className="sm-node" style={{ animationDelay: `${ti * 80}ms` }}>
                   <rect
                     x={tx} y={ty}
                     width={THEME_W} height={THEME_H}
@@ -252,7 +262,7 @@ export default function MarketMap({ competitors, isLiveData }: Props) {
             })}
 
             {/* ── Competitor nodes ── */}
-            {competitors.map(c => {
+            {competitors.map((c, ci) => {
               const cp = compPos.get(c.id)
               if (!cp) return null
 
@@ -267,7 +277,8 @@ export default function MarketMap({ competitors, isLiveData }: Props) {
                   key={c.id}
                   transform={`translate(${cp.x} ${cp.y})`}
                   opacity={vis ? 1 : 0.08}
-                  style={{ cursor: vis ? 'pointer' : 'default' }}
+                  className="sm-node"
+                  style={{ cursor: vis ? 'pointer' : 'default', animationDelay: `${120 + ci * 40}ms` }}
                   onClick={() => { if (vis) setSelected(c) }}
                   onMouseEnter={() => setHovered(c.id)}
                   onMouseLeave={() => setHovered(null)}
