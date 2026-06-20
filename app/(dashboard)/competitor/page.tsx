@@ -1,8 +1,7 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import Link from 'next/link'
-import { ExternalLink, Users, Zap } from 'lucide-react'
+import { useEffect, useState, useCallback } from 'react'
+import { ExternalLink, Users, Zap, RefreshCw, CheckCircle2, AlertCircle } from 'lucide-react'
 import { THEME_CONFIG } from '@/components/map/mock-data'
 import type { Theme } from '@/components/map/mock-data'
 
@@ -16,6 +15,14 @@ type CompetitorRow = {
   signals_week: number
   last_signal: string | null
   themes: string[]
+}
+
+type SyncState = {
+  status: 'idle' | 'syncing' | 'done' | 'error'
+  pagesProcessed?: number
+  pagesWithHistory?: number
+  signals?: Array<{ label: string; signal?: string }>
+  error?: string
 }
 
 function getLogoUrl(website: string) {
@@ -48,12 +55,7 @@ function CompetitorLogo({ website, name }: { website: string; name: string }) {
   }
   return (
     <div className="w-9 h-9 rounded-xl bg-gray-50 border border-gray-100 flex items-center justify-center overflow-hidden shrink-0">
-      <img
-        src={url}
-        alt={name}
-        className="w-6 h-6 object-contain"
-        onError={() => setFailed(true)}
-      />
+      <img src={url} alt={name} className="w-6 h-6 object-contain" onError={() => setFailed(true)} />
     </div>
   )
 }
@@ -62,8 +64,10 @@ export default function CompetitorsPage() {
   const [competitors, setCompetitors] = useState<CompetitorRow[] | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [syncStates, setSyncStates] = useState<Record<string, SyncState>>({})
+  const [deepSyncingAll, setDeepSyncingAll] = useState(false)
 
-  useEffect(() => {
+  const loadCompetitors = useCallback(() => {
     fetch('/api/competitors')
       .then(r => r.json())
       .then(data => {
@@ -74,11 +78,48 @@ export default function CompetitorsPage() {
       .finally(() => setLoading(false))
   }, [])
 
+  useEffect(() => { loadCompetitors() }, [loadCompetitors])
+
+  async function deepSync(competitorId: string) {
+    setSyncStates(prev => ({ ...prev, [competitorId]: { status: 'syncing' } }))
+    try {
+      const res = await fetch(`/api/deep-sync/${competitorId}`, { method: 'POST' })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error ?? 'Sync failed')
+      setSyncStates(prev => ({
+        ...prev,
+        [competitorId]: {
+          status: 'done',
+          pagesProcessed: data.pages_processed,
+          pagesWithHistory: data.pages_with_history,
+          signals: data.results,
+        },
+      }))
+      // Refresh competitor list to reflect new signal counts
+      setTimeout(loadCompetitors, 500)
+    } catch (err) {
+      setSyncStates(prev => ({
+        ...prev,
+        [competitorId]: { status: 'error', error: String(err).replace('Error: ', '') },
+      }))
+    }
+  }
+
+  async function deepSyncAll() {
+    if (!competitors?.length) return
+    setDeepSyncingAll(true)
+    for (const c of competitors) {
+      if (syncStates[c.id]?.status === 'syncing') continue
+      await deepSync(c.id)
+    }
+    setDeepSyncingAll(false)
+  }
+
   if (loading) {
     return (
       <div className="h-full overflow-y-auto">
         <div className="max-w-3xl mx-auto px-6 py-8 space-y-3">
-          {[1,2,3,4,5].map(i => (
+          {[1, 2, 3, 4, 5].map(i => (
             <div key={i} className="h-[72px] bg-gray-100 rounded-2xl animate-pulse" />
           ))}
         </div>
@@ -97,7 +138,7 @@ export default function CompetitorsPage() {
     )
   }
 
-  const highRisk   = competitors?.filter(c => c.risk_score >= 75).length ?? 0
+  const highRisk    = competitors?.filter(c => c.risk_score >= 75).length ?? 0
   const totalSignals = competitors?.reduce((sum, c) => sum + c.signals_week, 0) ?? 0
 
   return (
@@ -110,13 +151,31 @@ export default function CompetitorsPage() {
             <h1 className="text-gray-900 text-xl font-bold">Competitors</h1>
             <p className="text-gray-400 text-sm mt-0.5">{competitors?.length ?? 0} being tracked</p>
           </div>
-          <Link
-            href="/settings"
-            className="text-xs font-semibold text-violet-600 hover:text-violet-700 border border-violet-200 px-3 py-2 rounded-xl hover:bg-violet-50 transition-all"
-          >
-            + Add competitor
-          </Link>
+          {(competitors?.length ?? 0) > 0 && (
+            <button
+              onClick={deepSyncAll}
+              disabled={deepSyncingAll}
+              className="flex items-center gap-1.5 text-xs font-semibold text-violet-600 hover:text-violet-700 border border-violet-200 px-3 py-2 rounded-xl hover:bg-violet-50 transition-all disabled:opacity-50"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${deepSyncingAll ? 'animate-spin' : ''}`} />
+              {deepSyncingAll ? 'Deep Syncing…' : 'Deep Sync All'}
+            </button>
+          )}
         </div>
+
+        {/* Deep Sync explanation banner */}
+        {(competitors?.length ?? 0) > 0 && (
+          <div className="bg-violet-50 border border-violet-100 rounded-2xl px-4 py-3 mb-5 flex items-start gap-3">
+            <RefreshCw className="w-4 h-4 text-violet-500 mt-0.5 shrink-0" />
+            <div>
+              <p className="text-violet-800 text-xs font-semibold">Deep Sync — 30-day historical intelligence</p>
+              <p className="text-violet-600 text-xs mt-0.5 leading-relaxed">
+                Crawls Home, Pricing, Blog, Changelog, and Newsroom for each competitor.
+                Compares against Wayback Machine snapshots from 30 days ago to surface real diffs — pricing moves, new features, messaging shifts, and PR activity.
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* Stats row */}
         {(competitors?.length ?? 0) > 0 && (
@@ -140,84 +199,129 @@ export default function CompetitorsPage() {
           <div className="text-center py-16 border border-dashed border-gray-300 rounded-2xl bg-white">
             <Users className="w-8 h-8 text-gray-300 mx-auto mb-3" />
             <p className="text-gray-500 text-sm">No competitors tracked yet</p>
-            <Link href="/settings" className="text-violet-600 text-sm hover:underline mt-1 block">
+            <a href="/settings" className="text-violet-600 text-sm hover:underline mt-1 block">
               Add your first competitor →
-            </Link>
+            </a>
           </div>
         ) : (
           <div className="space-y-2">
             {competitors.map((c) => {
               const riskLevel = c.risk_score >= 75 ? 'High' : c.risk_score >= 45 ? 'Medium' : 'Low'
               const riskConfig = {
-                High:   { cls: 'text-red-600 bg-red-50 border-red-100', dot: 'bg-red-500' },
-                Medium: { cls: 'text-amber-600 bg-amber-50 border-amber-100', dot: 'bg-amber-400' },
-                Low:    { cls: 'text-emerald-600 bg-emerald-50 border-emerald-100', dot: 'bg-emerald-400' },
+                High:   { cls: 'text-red-600 bg-red-50 border-red-100' },
+                Medium: { cls: 'text-amber-600 bg-amber-50 border-amber-100' },
+                Low:    { cls: 'text-emerald-600 bg-emerald-50 border-emerald-100' },
               }[riskLevel]
-
               const ago = timeAgo(c.last_signal)
+              const sync = syncStates[c.id] ?? { status: 'idle' }
 
               return (
-                <Link
-                  key={c.id}
-                  href={`/competitor/${c.id}`}
-                  className="flex items-center gap-4 bg-white border border-gray-200 rounded-2xl px-4 py-3.5 hover:border-violet-200 hover:shadow-sm transition-all group"
-                >
-                  <CompetitorLogo website={c.website} name={c.name} />
+                <div key={c.id} className="bg-white border border-gray-200 rounded-2xl overflow-hidden">
+                  {/* Main row */}
+                  <div className="flex items-center gap-4 px-4 py-3.5">
+                    <CompetitorLogo website={c.website} name={c.name} />
 
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <p className="text-gray-900 font-semibold text-sm">{c.name}</p>
-                      {c.signals_week > 0 && (
-                        <span className="flex items-center gap-0.5 text-[10px] font-bold text-violet-600 bg-violet-50 px-1.5 py-0.5 rounded-full border border-violet-100">
-                          <Zap className="w-2.5 h-2.5" />
-                          {c.signals_week} this week
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-2 mt-0.5">
-                      <a
-                        href={c.website}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        onClick={(e) => e.stopPropagation()}
-                        className="flex items-center gap-0.5 text-gray-400 text-xs hover:text-gray-600 transition-colors"
-                      >
-                        {c.website.replace(/^https?:\/\//, '')}
-                        <ExternalLink className="w-2.5 h-2.5" />
-                      </a>
-                      {ago && (
-                        <>
-                          <span className="text-gray-200">·</span>
-                          <span className="text-xs text-gray-400">last signal {ago}</span>
-                        </>
-                      )}
-                    </div>
-                    {c.themes.length > 0 && (
-                      <div className="flex items-center gap-1 mt-1.5">
-                        {c.themes.slice(0, 3).map(t => {
-                          const cfg = THEME_CONFIG[t as Theme]
-                          return cfg ? (
-                            <span key={t} className="text-[10px] px-1.5 py-0.5 rounded font-medium"
-                              style={{ backgroundColor: cfg.bg, color: cfg.color }}>
-                              {cfg.label}
-                            </span>
-                          ) : null
-                        })}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <a
+                          href={`/battle/${c.id}`}
+                          className="text-gray-900 font-semibold text-sm hover:text-violet-700 transition-colors"
+                        >
+                          {c.name}
+                        </a>
+                        {c.signals_week > 0 && (
+                          <span className="flex items-center gap-0.5 text-[10px] font-bold text-violet-600 bg-violet-50 px-1.5 py-0.5 rounded-full border border-violet-100">
+                            <Zap className="w-2.5 h-2.5" />
+                            {c.signals_week} this week
+                          </span>
+                        )}
                       </div>
-                    )}
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <a
+                          href={c.website}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-0.5 text-gray-400 text-xs hover:text-gray-600 transition-colors"
+                        >
+                          {c.website.replace(/^https?:\/\//, '')}
+                          <ExternalLink className="w-2.5 h-2.5" />
+                        </a>
+                        {ago && (
+                          <>
+                            <span className="text-gray-200">·</span>
+                            <span className="text-xs text-gray-400">last signal {ago}</span>
+                          </>
+                        )}
+                      </div>
+                      {c.themes.length > 0 && (
+                        <div className="flex items-center gap-1 mt-1.5">
+                          {c.themes.slice(0, 3).map(t => {
+                            const cfg = THEME_CONFIG[t as Theme]
+                            return cfg ? (
+                              <span key={t} className="text-[10px] px-1.5 py-0.5 rounded font-medium"
+                                style={{ backgroundColor: cfg.bg, color: cfg.color }}>
+                                {cfg.label}
+                              </span>
+                            ) : null
+                          })}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-3 shrink-0">
+                      <div className="text-right">
+                        <p className="text-lg font-bold text-gray-900">{c.risk_score}</p>
+                        <p className="text-[10px] text-gray-400">risk</p>
+                      </div>
+                      <span className={`text-[11px] font-semibold px-2.5 py-1 rounded-xl border ${riskConfig.cls}`}>
+                        {riskLevel}
+                      </span>
+                      <button
+                        onClick={() => deepSync(c.id)}
+                        disabled={sync.status === 'syncing'}
+                        title="Deep Sync — crawl full site + compare to 30-day Wayback snapshot"
+                        className="flex items-center gap-1 text-[11px] font-semibold text-gray-500 hover:text-violet-600 border border-gray-200 hover:border-violet-200 hover:bg-violet-50 px-2.5 py-1.5 rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        <RefreshCw className={`w-3 h-3 ${sync.status === 'syncing' ? 'animate-spin text-violet-500' : ''}`} />
+                        {sync.status === 'syncing' ? 'Syncing…' : 'Deep Sync'}
+                      </button>
+                    </div>
                   </div>
 
-                  <div className="flex items-center gap-3 shrink-0">
-                    <div className="text-right">
-                      <p className="text-lg font-bold text-gray-900">{c.risk_score}</p>
-                      <p className="text-[10px] text-gray-400">risk</p>
+                  {/* Sync result panel */}
+                  {sync.status === 'done' && (
+                    <div className="border-t border-gray-100 bg-emerald-50 px-4 py-3">
+                      <div className="flex items-start gap-2">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-500 mt-0.5 shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-emerald-700 text-xs font-semibold">
+                            Deep Sync complete — {sync.pagesProcessed} pages crawled
+                            {(sync.pagesWithHistory ?? 0) > 0
+                              ? `, ${sync.pagesWithHistory} with 30-day Wayback history`
+                              : ' (no Wayback snapshots available)'}
+                          </p>
+                          {sync.signals && sync.signals.length > 0 && (
+                            <ul className="mt-2 space-y-1">
+                              {sync.signals.map((s, i) => s.signal && (
+                                <li key={i} className="text-[11px] text-emerald-800 leading-snug">
+                                  <span className="font-semibold text-emerald-600">{s.label}:</span>{' '}
+                                  {s.signal}
+                                </li>
+                              ))}
+                            </ul>
+                          )}
+                        </div>
+                      </div>
                     </div>
-                    <span className={`text-[11px] font-semibold px-2.5 py-1 rounded-xl border ${riskConfig.cls}`}>
-                      {riskLevel}
-                    </span>
-                    <span className="text-gray-300 group-hover:text-violet-400 transition-colors text-lg">›</span>
-                  </div>
-                </Link>
+                  )}
+
+                  {sync.status === 'error' && (
+                    <div className="border-t border-gray-100 bg-red-50 px-4 py-2.5 flex items-center gap-2">
+                      <AlertCircle className="w-4 h-4 text-red-400 shrink-0" />
+                      <p className="text-red-600 text-xs">{sync.error}</p>
+                    </div>
+                  )}
+                </div>
               )
             })}
           </div>
