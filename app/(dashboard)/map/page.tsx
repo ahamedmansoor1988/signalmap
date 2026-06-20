@@ -9,6 +9,41 @@ import type { Json } from '@/lib/supabase/types'
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Market Map — SignalMap' }
 
+const VALID_THEMES = ['AI Features', 'Pricing', 'Enterprise', 'GTM', 'Content'] as const
+type Theme = typeof VALID_THEMES[number]
+
+function pickTheme(
+  allChanges: Array<{ theme: string | null }>,
+  idx: number
+): Theme {
+  // Count votes per theme across ALL signals
+  const votes: Record<string, number> = {}
+  for (const c of allChanges) {
+    if (c.theme && VALID_THEMES.includes(c.theme as Theme)) {
+      votes[c.theme] = (votes[c.theme] ?? 0) + 1
+    }
+  }
+  // Pick most-voted theme
+  const winner = Object.entries(votes).sort((a, b) => b[1] - a[1])[0]?.[0] as Theme | undefined
+  // Only fall back to idx spread when there are genuinely no signals at all
+  return winner ?? VALID_THEMES[idx % VALID_THEMES.length]
+}
+
+function computeRisk(
+  dbScore: number,
+  allChanges: Array<{ detected_at: string; risk_score: number | null }>,
+  diffCount: number
+): number {
+  // Prefer DB score if it's been set by cron
+  if (dbScore > 0) return dbScore
+
+  // Derive from signal volume: each change +6, recent (7d) change +12, capped at 95
+  const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+  const recentCount = allChanges.filter(c => new Date(c.detected_at) >= sevenDaysAgo).length
+  const score = Math.min(95, allChanges.length * 6 + recentCount * 12 + diffCount * 8)
+  return score > 0 ? score : 0
+}
+
 export default async function MapPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -34,49 +69,51 @@ export default async function MapPage() {
           )
         `)
         .eq('org_id', membership.org_id)
-        .order('risk_score', { ascending: false })
+        .order('name')
 
       if (!dbCompetitors || dbCompetitors.length === 0) redirect('/onboarding')
 
-      if (dbCompetitors && dbCompetitors.length > 0) {
-        const themes = ['AI Features', 'Pricing', 'Enterprise', 'GTM', 'Content'] as const
-        type Theme = typeof themes[number]
+      // Fetch real diff counts for all competitor IDs
+      const ids = dbCompetitors.map(c => c.id)
+      const { data: diffs } = await supabase
+        .from('competitor_diffs')
+        .select('competitor_id')
+        .in('competitor_id', ids)
 
-        competitors = dbCompetitors.map((c, idx) => {
-          const allChanges = (c.changes as Array<{ changes: Array<{ theme: string | null; ai_signal: string | null; detected_at: string; risk_score: number | null }> }>)
-            .flatMap((tp) => tp.changes)
-            .sort((a, b) => new Date(b.detected_at).getTime() - new Date(a.detected_at).getTime())
-
-          const latestChange = allChanges[0]
-          const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
-          const activityCount = allChanges.filter((ch) => new Date(ch.detected_at) >= sevenDaysAgo).length
-
-          // Use theme from latest signal if available; otherwise spread evenly by index
-          // so competitors don't all pile into the same cluster before cron runs
-          const theme: Theme = (themes.includes(latestChange?.theme as Theme)
-            ? latestChange.theme
-            : themes[idx % themes.length]) as Theme
-
-          return {
-            id: c.id,
-            name: c.name,
-            website: c.website,
-            risk_score: c.risk_score > 0 ? c.risk_score : 40 + (idx % 5) * 8,
-            theme,
-            last_signal: latestChange?.ai_signal ?? 'No signals yet — cron runs daily at 8am UTC',
-            signals_count: allChanges.length,
-            activity_count: activityCount,
-            description: c.ai_summary ?? `Tracking ${c.website}`,
-            ai_summary: c.ai_summary ?? undefined,
-            suggested_actions: normalizeActions(c.suggested_actions as Json) || undefined,
-          }
-        })
+      const diffCountMap = new Map<string, number>()
+      for (const d of diffs ?? []) {
+        diffCountMap.set(d.competitor_id, (diffCountMap.get(d.competitor_id) ?? 0) + 1)
       }
+
+      competitors = dbCompetitors.map((c, idx) => {
+        type RawChange = { theme: string | null; ai_signal: string | null; detected_at: string; risk_score: number | null }
+        const allChanges = (c.changes as Array<{ changes: RawChange[] }>)
+          .flatMap(tp => tp.changes)
+          .sort((a, b) => new Date(b.detected_at).getTime() - new Date(a.detected_at).getTime())
+
+        const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+        const activityCount = allChanges.filter(ch => new Date(ch.detected_at) >= sevenDaysAgo).length
+
+        const theme    = pickTheme(allChanges, idx)
+        const riskScore = computeRisk(c.risk_score, allChanges, diffCountMap.get(c.id) ?? 0)
+
+        return {
+          id: c.id,
+          name: c.name,
+          website: c.website,
+          risk_score: riskScore,
+          theme,
+          last_signal: allChanges[0]?.ai_signal ?? 'No signals yet',
+          signals_count: allChanges.length,
+          activity_count: activityCount,
+          description: c.ai_summary ?? `Tracking ${c.website}`,
+          ai_summary: c.ai_summary ?? undefined,
+          suggested_actions: normalizeActions(c.suggested_actions as Json) || undefined,
+        }
+      })
     }
   }
 
-  // Fall back to mock data when DB is empty
   const data = competitors.length > 0 ? competitors : MOCK_COMPETITORS
-
   return <MarketMap competitors={data} isLiveData={competitors.length > 0} />
 }

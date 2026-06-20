@@ -13,7 +13,7 @@ import type { User } from '@supabase/supabase-js'
 const mainNav = [
   { href: '/map',        icon: Map,        label: 'Market Map' },
   { href: '/competitor', icon: Users,       label: 'Competitors' },
-  { href: '/changes',    icon: GitCompare,  label: 'Change Explorer' },
+  { href: '/changes',    icon: GitCompare,  label: 'Signal Inbox' },
   { href: '/brief',      icon: BarChart3,   label: 'Weekly Digest' },
   { href: '/battle',     icon: Swords,      label: 'Battle Room' },
   { href: '/trends',     icon: TrendingUp,  label: 'Trend Timeline' },

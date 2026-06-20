@@ -4,7 +4,7 @@ import ChangesClient from '@/components/changes/changes-client'
 import type { StructuredDiff } from '@/lib/extractor'
 import type { Json } from '@/lib/supabase/types'
 
-export const metadata = { title: 'Change Explorer — SignalMap' }
+export const metadata = { title: 'Signal Inbox — SignalMap' }
 
 export default async function ChangesPage() {
   const supabase = await createClient()
@@ -86,8 +86,8 @@ export default async function ChangesPage() {
     <div className="h-full overflow-y-auto">
       <div className="max-w-3xl mx-auto px-6 py-8">
         <div className="mb-6">
-          <h1 className="text-gray-900 text-xl font-semibold">Change Explorer</h1>
-          <p className="text-gray-500 text-sm mt-1">Every detected competitor move, explained by AI</p>
+          <h1 className="text-gray-900 text-xl font-semibold">Signal Inbox</h1>
+          <p className="text-gray-500 text-sm mt-1">Every competitor move, detected and explained by AI</p>
         </div>
 
         {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
