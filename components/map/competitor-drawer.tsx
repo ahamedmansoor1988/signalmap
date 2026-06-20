@@ -68,6 +68,54 @@ function RiskBadge({ score }: { score: number }) {
   )
 }
 
+function Sparkline({ points }: { points: number[] }) {
+  if (points.length < 2) return null
+
+  const W = 60
+  const H = 24
+  const PAD = 2
+  const w = W - PAD * 2
+  const h = H - PAD * 2
+
+  const min = Math.min(...points)
+  const max = Math.max(...points)
+  const range = max - min || 1
+
+  const first = points[0]
+  const last  = points[points.length - 1]
+  const delta = last - first
+  const color = delta > 1 ? '#EF4444' : delta < -1 ? '#10b981' : '#9ca3af'
+
+  const coords = points.map((v, i) => {
+    const x = PAD + (i / (points.length - 1)) * w
+    const y = PAD + (1 - (v - min) / range) * h
+    return `${x.toFixed(1)},${y.toFixed(1)}`
+  })
+
+  const lastPt = coords[coords.length - 1].split(',')
+  const tooltip = `Risk score ${first} → ${last} over ${points.length} days`
+
+  return (
+    <svg width={W} height={H} className="cursor-default overflow-visible">
+      <title>{tooltip}</title>
+      <polyline
+        points={coords.join(' ')}
+        fill="none"
+        stroke={color}
+        strokeWidth={1.5}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <circle
+        cx={lastPt[0]}
+        cy={lastPt[1]}
+        r={2.5}
+        fill={color}
+      />
+    </svg>
+  )
+}
+
 export default function CompetitorDrawer({ competitor, open, onClose }: {
   competitor: MockCompetitor | null
   open: boolean
@@ -80,6 +128,7 @@ export default function CompetitorDrawer({ competitor, open, onClose }: {
   const [scanError, setScanError] = useState<string | null>(null)
   const [activity, setActivity] = useState<ActivityItem[]>([])
   const [loadingActivity, setLoadingActivity] = useState(false)
+  const [riskHistory, setRiskHistory] = useState<number[]>([])
 
   const isReal = competitor ? isRealId(competitor.id) : false
 
@@ -121,11 +170,21 @@ export default function CompetitorDrawer({ competitor, open, onClose }: {
       .finally(() => setLoadingActivity(false))
   }, [open, competitor?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Reset scan + activity when switching competitors
+  // Fetch 7-day risk score history for sparkline
+  useEffect(() => {
+    if (!open || !competitor || !isReal) { setRiskHistory([]); return }
+    fetch(`/api/competitor/${competitor.id}/risk-history`)
+      .then(r => r.json())
+      .then((data: { history: number[] }) => setRiskHistory(data.history ?? []))
+      .catch(() => {})
+  }, [open, competitor?.id]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Reset scan + activity + history when switching competitors
   useEffect(() => {
     setScanPages(null)
     setScanError(null)
     setActivity([])
+    setRiskHistory([])
   }, [competitor?.id])
 
   const handleScan = useCallback(async () => {
@@ -177,7 +236,12 @@ export default function CompetitorDrawer({ competitor, open, onClose }: {
                 </a>
               </div>
             </div>
-            <RiskBadge score={competitor.risk_score} />
+            <div className="flex flex-col items-end gap-1.5 shrink-0">
+              <RiskBadge score={competitor.risk_score} />
+              {isReal && riskHistory.length >= 2 && (
+                <Sparkline points={riskHistory} />
+              )}
+            </div>
           </div>
           <div className="flex items-center gap-2">
             <span
