@@ -4,16 +4,17 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { cn } from '@/lib/utils'
-import { Map, Users, GitCompare, BarChart3, Mail, Settings } from 'lucide-react'
+import { Map, Users, GitCompare, BarChart3, Mail, Settings, Swords } from 'lucide-react'
 import type { User } from '@supabase/supabase-js'
 
 const navItems = [
-  { href: '/map', icon: Map, label: 'Market Map' },
-  { href: '/competitor', icon: Users, label: 'Competitors' },
-  { href: '/changes', icon: GitCompare, label: 'Changes' },
-  { href: '/brief', icon: BarChart3, label: 'Weekly Brief' },
-  { href: '/digest', icon: Mail, label: 'Digest' },
-  { href: '/settings', icon: Settings, label: 'Settings' },
+  { href: '/map',        icon: Map,       label: 'Market Map' },
+  { href: '/competitor', icon: Users,     label: 'Competitors' },
+  { href: '/changes',    icon: GitCompare, label: 'Changes' },
+  { href: '/brief',      icon: BarChart3,  label: 'Weekly Brief' },
+  { href: '/digest',     icon: Mail,       label: 'Digest' },
+  { href: '/battle',     icon: Swords,     label: 'Battle Room' },
+  { href: '/settings',   icon: Settings,   label: 'Settings' },
 ]
 
 const POLL_INTERVAL = 5 * 60 * 1000 // 5 minutes
