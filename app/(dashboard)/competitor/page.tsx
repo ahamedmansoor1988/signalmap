@@ -18,14 +18,41 @@ export default async function CompetitorsPage() {
 
   if (!membership) redirect('/settings')
 
-  const { data: competitors } = await supabase
-    .from('competitors')
-    .select(`
-      id, name, website, risk_score, created_at,
-      tracked_pages(id)
-    `)
-    .eq('org_id', membership.org_id)
-    .order('risk_score', { ascending: false })
+  type CompetitorRow = {
+    id: string
+    name: string
+    website: string
+    risk_score: number
+    created_at: string
+    tracked_pages: Array<{ id: string }> | null
+  }
+  let competitors: CompetitorRow[] | null = null
+  let loadError = false
+  try {
+    const { data } = await supabase
+      .from('competitors')
+      .select(`
+        id, name, website, risk_score, created_at,
+        tracked_pages(id)
+      `)
+      .eq('org_id', membership.org_id)
+      .order('risk_score', { ascending: false })
+    competitors = data
+  } catch (err) {
+    console.error('[competitors] failed to load:', err)
+    loadError = true
+  }
+
+  if (loadError) {
+    return (
+      <div className="h-full flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-gray-900 font-semibold mb-1">Something went wrong</p>
+          <p className="text-gray-400 text-sm">Could not load competitors. Try refreshing.</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="h-full overflow-y-auto">
@@ -82,7 +109,7 @@ export default async function CompetitorsPage() {
                         <ExternalLink className="w-3 h-3" />
                       </a>
                       <span className="text-gray-300 text-xs">
-                        {(c.tracked_pages as Array<{ id: string }>).length} pages tracked
+                        {(c.tracked_pages ?? []).length} pages tracked
                       </span>
                     </div>
                   </div>

@@ -96,30 +96,49 @@ export default async function BattleRoomPage({
 
   if (!competitor) notFound()
 
-  const [
-    { data: profile },
-    { data: snapshots },
-    { data: diffs },
-  ] = await Promise.all([
-    supabase
-      .from('company_profiles')
-      .select('company_name, description, icp, differentiators, website_url')
-      .eq('org_id', membership.org_id)
-      .maybeSingle(),
-    supabase
-      .from('competitor_snapshots')
-      .select('parsed_data, snapshot_date')
-      .eq('competitor_id', competitor.id)
-      .eq('page_type', 'homepage')
-      .order('snapshot_date', { ascending: false })
-      .limit(1),
-    supabase
-      .from('competitor_diffs')
-      .select('id, change_type, detected_at, summary')
-      .eq('competitor_id', competitor.id)
-      .order('detected_at', { ascending: false })
-      .limit(5),
-  ])
+  type ProfileRow = { company_name: string | null; description: string | null; icp: string | null; differentiators: string | null; website_url: string | null }
+  type SnapshotRow = { parsed_data: unknown; snapshot_date: string }
+  type DiffRow = { id: string; change_type: string; detected_at: string; summary: string | null }
+
+  let profile: ProfileRow | null = null
+  let snapshots: SnapshotRow[] | null = null
+  let diffs: DiffRow[] | null = null
+
+  try {
+    const [r1, r2, r3] = await Promise.all([
+      supabase
+        .from('company_profiles')
+        .select('company_name, description, icp, differentiators, website_url')
+        .eq('org_id', membership.org_id)
+        .maybeSingle(),
+      supabase
+        .from('competitor_snapshots')
+        .select('parsed_data, snapshot_date')
+        .eq('competitor_id', competitor.id)
+        .eq('page_type', 'homepage')
+        .order('snapshot_date', { ascending: false })
+        .limit(1),
+      supabase
+        .from('competitor_diffs')
+        .select('id, change_type, detected_at, summary')
+        .eq('competitor_id', competitor.id)
+        .order('detected_at', { ascending: false })
+        .limit(5),
+    ])
+    profile = r1.data as ProfileRow | null
+    snapshots = r2.data as SnapshotRow[] | null
+    diffs = r3.data as DiffRow[] | null
+  } catch (err) {
+    console.error('[battle/[competitorId]] failed to load:', err)
+    return (
+      <div className="h-full flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-gray-900 font-semibold mb-1">Something went wrong</p>
+          <p className="text-gray-400 text-sm">Could not load battle data. Try refreshing.</p>
+        </div>
+      </div>
+    )
+  }
 
   const homepageData = (snapshots?.[0]?.parsed_data ?? null) as HomepageData | null
   const recentDiffs = diffs ?? []

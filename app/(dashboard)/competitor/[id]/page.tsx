@@ -10,33 +10,59 @@ import RiskSparkline from '@/components/competitor/risk-sparkline'
 export default async function CompetitorProfilePage({ params }: { params: { id: string } }) {
   const supabase = await createClient()
 
-  const [{ data: competitor }, { data: diffs }, { data: riskHistory }] = await Promise.all([
-    supabase
-      .from('competitors')
-      .select(`
-        *,
-        tracked_pages(
-          id, url, label, last_crawled_at,
-          changes(id, ai_signal, ai_summary, theme, risk_score, confidence, detected_at)
-        )
-      `)
-      .eq('id', params.id)
-      .single(),
+  type CompetitorFull = {
+    id: string; name: string; website: string; risk_score: number
+    ai_summary: string | null; tracked_pages: unknown
+  }
+  type DiffRow = { id: string; change_type: string; detected_at: string; summary: string | null }
+  type RiskRow = { scored_at: string; product_velocity: number; messaging_overlap: number; market_reach: number; total: number }
 
-    supabase
-      .from('competitor_diffs')
-      .select('id, change_type, detected_at, summary')
-      .eq('competitor_id', params.id)
-      .order('detected_at', { ascending: false })
-      .limit(100),
+  let competitor: CompetitorFull | null = null
+  let diffs: DiffRow[] | null = null
+  let riskHistory: RiskRow[] | null = null
 
-    supabase
-      .from('risk_score_history')
-      .select('scored_at, product_velocity, messaging_overlap, market_reach, total')
-      .eq('competitor_id', params.id)
-      .order('scored_at', { ascending: false })
-      .limit(30),
-  ])
+  try {
+    const [r1, r2, r3] = await Promise.all([
+      supabase
+        .from('competitors')
+        .select(`
+          *,
+          tracked_pages(
+            id, url, label, last_crawled_at,
+            changes(id, ai_signal, ai_summary, theme, risk_score, confidence, detected_at)
+          )
+        `)
+        .eq('id', params.id)
+        .single(),
+
+      supabase
+        .from('competitor_diffs')
+        .select('id, change_type, detected_at, summary')
+        .eq('competitor_id', params.id)
+        .order('detected_at', { ascending: false })
+        .limit(100),
+
+      supabase
+        .from('risk_score_history')
+        .select('scored_at, product_velocity, messaging_overlap, market_reach, total')
+        .eq('competitor_id', params.id)
+        .order('scored_at', { ascending: false })
+        .limit(30),
+    ])
+    competitor = r1.data as CompetitorFull | null
+    diffs = r2.data as DiffRow[] | null
+    riskHistory = r3.data as RiskRow[] | null
+  } catch (err) {
+    console.error('[competitor/[id]] failed to load:', err)
+    return (
+      <div className="h-full flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-gray-900 font-semibold mb-1">Something went wrong</p>
+          <p className="text-gray-400 text-sm">Could not load competitor data. Try refreshing.</p>
+        </div>
+      </div>
+    )
+  }
 
   if (!competitor) notFound()
 
@@ -56,7 +82,7 @@ export default async function CompetitorProfilePage({ params }: { params: { id: 
     }>
   }
 
-  const pages = competitor.tracked_pages as TrackedPage[]
+  const pages = (competitor.tracked_pages as TrackedPage[] | null) ?? []
   const allChanges = pages
     .flatMap((p) => p.changes.map((c) => ({ ...c, page: p })))
     .sort((a, b) => new Date(b.detected_at).getTime() - new Date(a.detected_at).getTime())
