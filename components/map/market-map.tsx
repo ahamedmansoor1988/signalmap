@@ -3,7 +3,7 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
 import { THEME_CONFIG, type Theme } from './mock-data'
 import CompetitorDrawer from './competitor-drawer'
-import { Search, Plus, Calendar, ChevronDown, Database } from 'lucide-react'
+import { Search, Plus, Calendar, ChevronDown, Database, RefreshCw } from 'lucide-react'
 import Link from 'next/link'
 import { getLogoUrl } from '@/lib/get-logo-url'
 import type { TypedAction } from '@/lib/typed-actions'
@@ -86,6 +86,27 @@ export default function MarketMap({ competitors, isLiveData }: Props) {
   const [hovered,   setHovered]   = useState<string | null>(null)
   const [search,    setSearch]    = useState('')
   const [imgErrors, setImgErrors] = useState<Set<string>>(new Set())
+  const [syncing,   setSyncing]   = useState(false)
+  const [syncMsg,   setSyncMsg]   = useState<string | null>(null)
+
+  async function handleSyncNow() {
+    if (syncing) return
+    setSyncing(true)
+    setSyncMsg('Crawling competitors…')
+    try {
+      const res = await fetch('/api/sync-now', { method: 'POST' })
+      const data = await res.json() as { synced?: number; error?: string }
+      if (data.error) setSyncMsg(`Error: ${data.error}`)
+      else {
+        setSyncMsg(`✓ Synced ${data.synced} competitors — refresh to see signals`)
+        setTimeout(() => setSyncMsg(null), 6000)
+      }
+    } catch {
+      setSyncMsg('Sync failed — try again')
+    } finally {
+      setSyncing(false)
+    }
+  }
 
   // Pan + zoom state
   const [zoom,   setZoom]   = useState(0.75)
@@ -197,10 +218,25 @@ export default function MarketMap({ competitors, isLiveData }: Props) {
           </span>
         )}
         <div className="flex-1" />
+        <button
+          onClick={handleSyncNow}
+          disabled={syncing}
+          className="flex items-center gap-1.5 text-xs px-3 py-1.5 border border-gray-200 rounded-lg text-gray-600 bg-white hover:bg-gray-50 disabled:opacity-50 shrink-0 transition-all"
+        >
+          <RefreshCw className={`w-3.5 h-3.5 ${syncing ? 'animate-spin' : ''}`} />
+          {syncing ? 'Syncing…' : 'Sync Now'}
+        </button>
         <Link href="/settings" className="flex items-center gap-1.5 text-xs px-3 py-1.5 bg-violet-600 text-white rounded-lg hover:bg-violet-700 font-medium shrink-0">
           <Plus className="w-3.5 h-3.5" /> Add Competitor
         </Link>
       </div>
+
+      {/* Sync toast */}
+      {syncMsg && (
+        <div className="absolute top-14 left-1/2 -translate-x-1/2 z-50 bg-gray-900 text-white text-xs px-4 py-2 rounded-full shadow-lg pointer-events-none">
+          {syncMsg}
+        </div>
+      )}
 
       {/* ── Canvas ── */}
       <div className="flex-1 relative overflow-hidden">
