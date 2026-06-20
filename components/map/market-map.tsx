@@ -28,14 +28,14 @@ interface Props {
 }
 
 // ── Canvas ─────────────────────────────────────────────────────
-const W  = 1300
-const H  = 820
-const CX = W / 2
-const CY = H / 2
+const W  = 1400
+const H  = 1060
+const CX = W / 2       // 700
+const CY = H / 2 + 30  // 560 — nudge down so top cluster has breathing room
 
 // ── Sizes ──────────────────────────────────────────────────────
-const THEME_R  = 290   // push themes wide to fill canvas
-const COMP_D   = 145   // distance from theme centre to competitor logo
+const THEME_R  = 280   // theme ring radius
+const COMP_D   = 130   // competitor distance from theme card centre
 const NODE_R   = 22    // logo circle radius
 const TW       = 126   // theme card width
 const TH       = 48    // theme card height
@@ -150,6 +150,28 @@ export default function MarketMap({ competitors, isLiveData }: Props) {
 
           {/* ── Zoom group ── */}
           <g transform={`translate(${tx} ${ty}) scale(${zoom})`}>
+
+            {/* ── Center anchor ── */}
+            <circle cx={CX} cy={CY} r={6} fill="#e5e7eb" />
+            <circle cx={CX} cy={CY} r={3} fill="#9ca3af" />
+
+            {/* ── Spoke lines from center to each theme card ── */}
+            {themes.map(theme => {
+              const tp  = tPos.get(theme)!
+              const cfg = THEME_CONFIG[theme]
+              const dx  = tp.x - CX
+              const dy  = tp.y - CY
+              const len = Math.sqrt(dx*dx + dy*dy) || 1
+              // end just before theme card edge
+              const ex  = CX + (dx/len) * (THEME_R - TW/2 - 6)
+              const ey  = CY + (dy/len) * (THEME_R - TH/2 - 6)
+              return (
+                <line key={`spoke-${theme}`}
+                  x1={CX} y1={CY} x2={ex} y2={ey}
+                  stroke={cfg.color} strokeWidth={1} strokeOpacity={0.15}
+                />
+              )
+            })}
 
             {/* ── Curved lines (drawn first = behind everything) ── */}
             {themes.map(theme => {
