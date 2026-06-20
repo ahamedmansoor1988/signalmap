@@ -7,7 +7,14 @@ export const metadata = { title: 'Competitors — SignalMap' }
 
 export default async function CompetitorsPage() {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+
+  let user = null
+  try {
+    const result = await supabase.auth.getUser()
+    user = result.data?.user ?? null
+  } catch {
+    // auth service unavailable
+  }
   if (!user) redirect('/login')
 
   const { data: membership } = await supabase
