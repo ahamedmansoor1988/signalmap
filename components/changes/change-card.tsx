@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { AlertTriangle, Clock, TrendingUp, ChevronDown, ChevronUp, Eye, Check } from 'lucide-react'
+import { AlertTriangle, Clock, TrendingUp, ChevronDown, ChevronUp, Eye, Check, ExternalLink } from 'lucide-react'
 import { THEME_CONFIG } from '@/components/map/mock-data'
 import type { Theme } from '@/components/map/mock-data'
 import type { Database } from '@/lib/supabase/types'
@@ -163,6 +163,21 @@ export default function ChangeCard({ change }: { change: Change }) {
               </div>
             </div>
           )}
+
+          {/* Source URL */}
+          <div className="flex items-center gap-1.5 pt-1">
+            <ExternalLink className="w-3 h-3 text-gray-300 shrink-0" />
+            <a
+              href={change.tracked_pages.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              className="text-xs text-gray-400 hover:text-gray-600 transition-colors truncate"
+              title={change.tracked_pages.url}
+            >
+              {change.tracked_pages.url.replace(/^https?:\/\//, '')}
+            </a>
+          </div>
 
           <div className="flex items-center justify-between pt-1 border-t border-gray-100">
             <a
