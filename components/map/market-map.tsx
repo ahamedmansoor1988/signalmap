@@ -5,7 +5,7 @@ import { THEME_CONFIG, type Theme } from './mock-data'
 import CompetitorDrawer from './competitor-drawer'
 import {
   Search, Plus, Calendar, ChevronDown,
-  ZoomIn, ZoomOut, Maximize2, Database,
+  Maximize2, Database,
 } from 'lucide-react'
 import Link from 'next/link'
 import { getLogoUrl } from '@/lib/get-logo-url'
@@ -34,19 +34,13 @@ interface Props {
 const SVG_W    = 1200
 const SVG_H    = 860
 const CX       = SVG_W / 2   // 600
-const CY       = SVG_H / 2   // 430
-const THEME_R  = 160          // center → theme-card center
+const CY       = SVG_H / 2 + 20  // shift down slightly for title
+const THEME_R  = 110          // themes tight to center
 const NODE_R   = 20           // competitor circle radius (40px diameter)
 const THEME_W  = 118          // theme card width
 const THEME_H  = 50           // theme card height
 const THEME_RX = 10           // card corner radius
 // Single-arc and 2-row layout distances (defined in computeLayout below)
-
-// Deterministic avatar colour
-const AVATAR_COLORS = ['#6366f1','#8b5cf6','#06b6d4','#10b981','#f59e0b','#ef4444','#ec4899','#3b82f6']
-function avatarBg(name: string) {
-  return AVATAR_COLORS[(name.charCodeAt(0) ?? 0) % AVATAR_COLORS.length]
-}
 
 function activityColor(count: number): string {
   if (!count) return '#9ca3af'
@@ -88,7 +82,7 @@ function computeLayout(competitors: MapCompetitor[]) {
 
     if (Nc <= 4) {
       // Single arc: fan up to 70° around the radial direction
-      const ARC_R  = 185
+      const ARC_R  = 200
       const spread = Math.min((Nc - 1) * 0.44, 1.22) // max ~70°
       const step   = Nc > 1 ? spread / (Nc - 1) : 0
       group.forEach((comp, i) => {
@@ -100,8 +94,8 @@ function computeLayout(competitors: MapCompetitor[]) {
       })
     } else {
       // 2-row grid: row 1 closer to theme, row 2 farther out
-      const ROW1   = 175   // radial distance to row 1
-      const ROW2   = 240   // radial distance to row 2
+      const ROW1   = 190   // radial distance to row 1
+      const ROW2   = 260   // radial distance to row 2
       const SPACING = 52   // lateral gap between nodes (NODE_R*2 + 12px clearance)
       const N1 = Math.ceil(Nc / 2)
       const N2 = Nc - N1
@@ -218,6 +212,28 @@ export default function MarketMap({ competitors, isLiveData }: Props) {
             ))}
           </defs>
 
+          {/* ── Title + subtitle — fixed, outside zoom group ── */}
+          <text
+            x={SVG_W / 2} y={32}
+            textAnchor="middle"
+            fontSize={13}
+            fontWeight="700"
+            letterSpacing="0.18em"
+            fill="#111827"
+            fontFamily="ui-sans-serif, system-ui, sans-serif"
+          >
+            AI MARKET MAP
+          </text>
+          <text
+            x={SVG_W / 2} y={52}
+            textAnchor="middle"
+            fontSize={10.5}
+            fill="#9ca3af"
+            fontFamily="ui-sans-serif, system-ui, sans-serif"
+          >
+            Visualize what&apos;s happening in your market
+          </text>
+
           <g transform={transform}>
 
             {/* ── Connecting lines ── */}
@@ -235,9 +251,8 @@ export default function MarketMap({ competitors, isLiveData }: Props) {
                       x1={tp.x} y1={tp.y}
                       x2={cp.x} y2={cp.y}
                       stroke={cfg.color}
-                      strokeWidth={1.5}
-                      strokeOpacity={visible(c) ? 0.45 : 0.05}
-                      strokeDasharray="4 3"
+                      strokeWidth={1}
+                      strokeOpacity={visible(c) ? 0.28 : 0.04}
                     />
                   )
                 })
@@ -247,9 +262,7 @@ export default function MarketMap({ competitors, isLiveData }: Props) {
             {activeThemes.map(theme => {
               const tp  = themePos.get(theme)!
               const cfg = THEME_CONFIG[theme]
-              const signals = competitors
-                .filter(c => c.theme === theme)
-                .reduce((s, c) => s + (c.activity_count ?? 0), 0)
+              const count = competitors.filter(c => c.theme === theme).length
               const tx = tp.x - THEME_W / 2
               const ty = tp.y - THEME_H / 2
               return (
@@ -261,7 +274,7 @@ export default function MarketMap({ competitors, isLiveData }: Props) {
                     fill={cfg.bg}
                     stroke={cfg.color}
                     strokeWidth={1.5}
-                    strokeOpacity={0.45}
+                    strokeOpacity={0.5}
                   />
                   <text
                     x={tp.x} y={ty + 19}
@@ -278,10 +291,10 @@ export default function MarketMap({ competitors, isLiveData }: Props) {
                     textAnchor="middle"
                     fontSize={10}
                     fill={cfg.color}
-                    fillOpacity={0.65}
+                    fillOpacity={0.7}
                     fontFamily="ui-sans-serif, system-ui, sans-serif"
                   >
-                    ✦ {signals} signals
+                    ✦ {count}
                   </text>
                 </g>
               )
@@ -292,7 +305,6 @@ export default function MarketMap({ competitors, isLiveData }: Props) {
               const cp = compPos.get(c.id)
               if (!cp) return null
 
-              const cfg     = THEME_CONFIG[c.theme]
               const vis     = visible(c)
               const isHov   = hovered === c.id
               const logoUrl = imgErrors.has(c.id) ? null : getLogoUrl(c.website)
@@ -303,7 +315,7 @@ export default function MarketMap({ competitors, isLiveData }: Props) {
                 <g
                   key={c.id}
                   transform={`translate(${cp.x} ${cp.y})`}
-                  opacity={vis ? 1 : 0.1}
+                  opacity={vis ? 1 : 0.08}
                   style={{ cursor: vis ? 'pointer' : 'default' }}
                   onClick={() => { if (vis) setSelected(c) }}
                   onMouseEnter={() => setHovered(c.id)}
@@ -311,24 +323,23 @@ export default function MarketMap({ competitors, isLiveData }: Props) {
                 >
                   {/* Hover glow */}
                   {isHov && (
-                    <circle r={NODE_R + 6} fill={cfg.color} fillOpacity={0.13} />
+                    <circle r={NODE_R + 7} fill="#6366f1" fillOpacity={0.1} />
                   )}
 
-                  {/* Circle */}
+                  {/* Circle — always white, clean */}
                   <circle
                     r={NODE_R}
-                    fill={logoUrl ? 'white' : avatarBg(c.name)}
-                    stroke={cfg.color}
-                    strokeWidth={isHov ? 2.5 : 1.5}
-                    strokeOpacity={isHov ? 1 : 0.55}
+                    fill="white"
+                    stroke={isHov ? '#6366f1' : '#d1d5db'}
+                    strokeWidth={isHov ? 2 : 1.5}
                   />
 
                   {/* Favicon */}
                   {logoUrl ? (
                     <image
                       href={logoUrl}
-                      x={-(NODE_R - 2)} y={-(NODE_R - 2)}
-                      width={(NODE_R - 2) * 2} height={(NODE_R - 2) * 2}
+                      x={-(NODE_R - 3)} y={-(NODE_R - 3)}
+                      width={(NODE_R - 3) * 2} height={(NODE_R - 3) * 2}
                       clipPath={`url(#fav-${c.id})`}
                       preserveAspectRatio="xMidYMid meet"
                       onError={() => markImgError(c.id)}
@@ -339,7 +350,7 @@ export default function MarketMap({ competitors, isLiveData }: Props) {
                       dominantBaseline="central"
                       fontSize={11}
                       fontWeight="700"
-                      fill="white"
+                      fill="#374151"
                       fontFamily="ui-sans-serif, system-ui, sans-serif"
                     >
                       {initial}
@@ -372,30 +383,34 @@ export default function MarketMap({ competitors, isLiveData }: Props) {
           <span className="text-gray-600 text-xs font-medium">✦ {activeThemes.length} major themes detected</span>
         </div>
 
-        {/* ── Zoom controls — bottom left ── */}
+        {/* ── Zoom controls — bottom left, horizontal ── */}
         <div className="absolute bottom-4 left-4">
-          <div className="bg-white border border-gray-200 rounded-xl shadow-sm flex flex-col divide-y divide-gray-100 overflow-hidden">
-            <button
-              onClick={zoomIn}
-              title="Zoom in"
-              className="w-8 h-8 flex items-center justify-center text-gray-500 hover:text-gray-800 hover:bg-gray-50 transition-colors"
-            >
-              <ZoomIn className="w-3.5 h-3.5" />
-            </button>
-            <div className="w-8 h-7 flex items-center justify-center">
-              <span className="text-gray-400 text-[10px] font-medium tabular-nums">{Math.round(zoom * 100)}%</span>
-            </div>
+          <div className="bg-white border border-gray-200 rounded-xl shadow-sm flex items-center divide-x divide-gray-100 overflow-hidden">
             <button
               onClick={zoomOut}
               title="Zoom out"
-              className="w-8 h-8 flex items-center justify-center text-gray-500 hover:text-gray-800 hover:bg-gray-50 transition-colors"
+              className="w-8 h-8 flex items-center justify-center text-gray-500 hover:text-gray-800 hover:bg-gray-50 transition-colors text-sm font-medium"
             >
-              <ZoomOut className="w-3.5 h-3.5" />
+              −
             </button>
             <button
               onClick={() => setZoom(1)}
               title="Reset zoom"
-              className="w-8 h-8 flex items-center justify-center text-gray-500 hover:text-gray-800 hover:bg-gray-50 transition-colors"
+              className="h-8 px-2.5 flex items-center justify-center text-gray-400 hover:text-gray-700 hover:bg-gray-50 transition-colors"
+            >
+              <span className="text-[10px] font-medium tabular-nums">{Math.round(zoom * 100)}%</span>
+            </button>
+            <button
+              onClick={zoomIn}
+              title="Zoom in"
+              className="w-8 h-8 flex items-center justify-center text-gray-500 hover:text-gray-800 hover:bg-gray-50 transition-colors text-sm font-medium"
+            >
+              +
+            </button>
+            <button
+              onClick={() => setZoom(1)}
+              title="Fullscreen reset"
+              className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-gray-700 hover:bg-gray-50 transition-colors"
             >
               <Maximize2 className="w-3 h-3" />
             </button>
