@@ -98,6 +98,17 @@ export default async function ChangesPage() {
     structured_diff: (diffsMap.get(c.id) ?? null) as Json | null,
   }))
 
+  // Mark all unseen changes as seen (fire-and-forget, don't block render)
+  if (pageIds.length) {
+    const now = new Date().toISOString()
+    supabase
+      .from('changes')
+      .update({ seen_at: now })
+      .in('tracked_page_id', pageIds)
+      .is('seen_at', null)
+      .then(() => {/* non-blocking */})
+  }
+
   return (
     <div className="h-full overflow-y-auto">
       <div className="max-w-3xl mx-auto px-6 py-8">

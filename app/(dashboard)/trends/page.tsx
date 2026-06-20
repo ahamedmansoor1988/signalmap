@@ -29,21 +29,38 @@ export default async function TrendTimelinePage() {
 
   if (!membership) redirect('/onboarding')
 
-  // Fetch all changes across all tracked competitors with theme
-  const { data: changes } = await supabase
+  // Resolve org → competitor IDs → page IDs, then query changes directly
+  const { data: orgCompetitors } = await supabase
+    .from('competitors')
+    .select('id, name, website')
+    .eq('org_id', membership.org_id)
+
+  const competitorIds = (orgCompetitors ?? []).map(c => c.id)
+  const competitorById = Object.fromEntries((orgCompetitors ?? []).map(c => [c.id, c]))
+
+  const { data: orgPages } = await supabase
+    .from('tracked_pages')
+    .select('id, competitor_id')
+    .in('competitor_id', competitorIds)
+
+  const pageIds = (orgPages ?? []).map(p => p.id)
+  const pageToCompetitor = Object.fromEntries((orgPages ?? []).map(p => [p.id, p.competitor_id]))
+
+  const { data: rawChanges } = await supabase
     .from('changes')
-    .select(`
-      id, theme, detected_at, ai_signal, risk_score,
-      tracked_pages(
-        competitors!inner(id, name, website, org_id)
-      )
-    `)
-    .eq('tracked_pages.competitors.org_id', membership.org_id)
+    .select('id, theme, detected_at, ai_signal, risk_score, tracked_page_id')
+    .in('tracked_page_id', pageIds)
     .not('theme', 'is', null)
     .order('detected_at', { ascending: false })
     .limit(200)
 
-  const safeChanges = changes ?? []
+  // Attach competitor info to match expected shape
+  const safeChanges = (rawChanges ?? []).map(c => ({
+    ...c,
+    tracked_pages: {
+      competitors: competitorById[pageToCompetitor[c.tracked_page_id]] ?? { id: '', name: '', website: '' },
+    },
+  }))
 
   // Group signals by theme + week
   const now = new Date()

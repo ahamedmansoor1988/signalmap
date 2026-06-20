@@ -6,7 +6,7 @@ import { useEffect, useState } from 'react'
 import { cn } from '@/lib/utils'
 import {
   Map, Users, GitCompare, BarChart3,
-  Settings, Swords, TrendingUp, Bell, ChevronDown,
+  Settings, Swords, TrendingUp,
 } from 'lucide-react'
 import type { User } from '@supabase/supabase-js'
 
@@ -17,21 +17,17 @@ const mainNav = [
   { href: '/brief',      icon: BarChart3,   label: 'Weekly Digest' },
   { href: '/battle',     icon: Swords,      label: 'Battle Room' },
   { href: '/trends',     icon: TrendingUp,  label: 'Trend Timeline' },
-  { href: '/digest',     icon: Bell,        label: 'Alerts' },
 ]
 
 const bottomNav = [
   { href: '/settings', icon: Settings, label: 'Settings' },
 ]
 
-const watchlists = ['Core PM Tools', 'CRM Platforms', 'AI Tools']
-
 const POLL_INTERVAL = 5 * 60 * 1000
 
 export default function DashboardNav({ user }: { user: User }) {
   const pathname = usePathname()
   const [unseenCount, setUnseenCount] = useState(0)
-  const [watchlistOpen, setWatchlistOpen] = useState(true)
 
   useEffect(() => {
     async function fetchCount() {
@@ -99,29 +95,6 @@ export default function DashboardNav({ user }: { user: User }) {
           })}
         </div>
 
-        {/* Watchlists */}
-        <div className="mt-4">
-          <button
-            onClick={() => setWatchlistOpen(v => !v)}
-            className="flex items-center justify-between w-full px-3 py-1.5 text-[11px] font-semibold text-gray-400 uppercase tracking-wider hover:text-gray-600 transition-colors"
-          >
-            Watchlists
-            <ChevronDown className={cn('w-3 h-3 transition-transform', watchlistOpen ? 'rotate-0' : '-rotate-90')} />
-          </button>
-          {watchlistOpen && (
-            <div className="mt-1 space-y-0.5">
-              {watchlists.map(w => (
-                <button
-                  key={w}
-                  className="flex items-center gap-2 w-full px-3 py-1.5 rounded-lg text-xs text-gray-500 hover:text-gray-800 hover:bg-gray-50 transition-colors text-left"
-                >
-                  <span className="w-1.5 h-1.5 rounded-full bg-gray-300 shrink-0" />
-                  {w}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
       </div>
 
       {/* Bottom: settings + user */}
@@ -149,7 +122,7 @@ export default function DashboardNav({ user }: { user: User }) {
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-xs font-semibold text-gray-800 truncate">{email.split('@')[0]}</p>
-            <p className="text-[10px] text-gray-400 truncate">PMM Lead</p>
+            <p className="text-[10px] text-gray-400 truncate">{email.split('@')[1] ?? 'SignalMap'}</p>
           </div>
         </div>
       </div>

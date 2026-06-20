@@ -67,14 +67,6 @@ export default async function CompetitorProfilePage({ params }: { params: { id: 
   const themeSet = new Set(allChanges.map(c => c.theme).filter(Boolean) as string[])
   const themes = Array.from(themeSet).slice(0, 5) as Theme[]
 
-  // Suggested actions based on risk
-  const suggestedActions = [
-    'Create battlecard',
-    'Notify sales team',
-    'Compare positioning',
-    'Add to roadmap review',
-  ]
-
   // Potential impact bullets from AI summary
   const impactPoints = competitor.ai_summary
     ? competitor.ai_summary.split('. ').filter(s => s.length > 20).slice(0, 3)
@@ -85,9 +77,9 @@ export default async function CompetitorProfilePage({ params }: { params: { id: 
       <div className="max-w-5xl mx-auto px-6 py-6">
 
         {/* Back nav */}
-        <Link href="/map" className="inline-flex items-center gap-1.5 text-gray-400 text-sm hover:text-gray-700 transition-colors mb-6">
+        <Link href="/competitor" className="inline-flex items-center gap-1.5 text-gray-400 text-sm hover:text-gray-700 transition-colors mb-6">
           <ArrowLeft className="w-3.5 h-3.5" />
-          Back to map
+          Back to Competitors
         </Link>
 
         {/* ── Header ── */}
@@ -132,9 +124,6 @@ export default async function CompetitorProfilePage({ params }: { params: { id: 
                 )}
               </div>
 
-              <button className="text-xs font-semibold px-4 py-2 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors">
-                Following
-              </button>
             </div>
           </div>
 
@@ -224,27 +213,24 @@ export default async function CompetitorProfilePage({ params }: { params: { id: 
             </div>
           </div>
 
-          {/* Suggested Actions */}
-          <div className="col-span-1 bg-white rounded-2xl border border-gray-200 p-5 shadow-sm">
-            <div className="flex items-center gap-2 mb-4">
+          {/* Quick actions */}
+          <div className="col-span-1 bg-white rounded-2xl border border-gray-200 p-5 shadow-sm flex flex-col gap-3">
+            <div className="flex items-center gap-2 mb-1">
               <Zap className="w-3.5 h-3.5 text-violet-500" />
-              <h2 className="text-sm font-semibold text-gray-900">Suggested Actions</h2>
+              <h2 className="text-sm font-semibold text-gray-900">Quick Actions</h2>
             </div>
-            <div className="space-y-2">
-              {suggestedActions.map(action => (
-                <button key={action}
-                  className="w-full text-left text-xs px-3 py-2.5 rounded-lg border border-gray-200 text-gray-700 hover:border-violet-300 hover:bg-violet-50 hover:text-violet-700 transition-colors">
-                  {action}
-                </button>
-              ))}
-            </div>
-
-            <div className="mt-4 pt-4 border-t border-gray-100">
-              <Link href={`/battle/${params.id}`}
-                className="flex items-center justify-center gap-1.5 w-full text-xs font-semibold px-3 py-2.5 rounded-lg bg-violet-600 text-white hover:bg-violet-700 transition-colors">
-                <TrendingUp className="w-3.5 h-3.5" />
-                Open Battle Room
-              </Link>
+            <Link href={`/battle/${params.id}`}
+              className="flex items-center justify-center gap-1.5 w-full text-xs font-semibold px-3 py-2.5 rounded-lg bg-violet-600 text-white hover:bg-violet-700 transition-colors">
+              <TrendingUp className="w-3.5 h-3.5" />
+              Open Battle Room
+            </Link>
+            <Link href={`/changes?competitor=${encodeURIComponent(competitor.name)}`}
+              className="flex items-center justify-center gap-1.5 w-full text-xs font-semibold px-3 py-2.5 rounded-lg border border-gray-200 text-gray-700 hover:border-violet-300 hover:bg-violet-50 hover:text-violet-700 transition-colors">
+              View All Signals →
+            </Link>
+            <div className="mt-auto pt-3 border-t border-gray-100 text-center">
+              <p className="text-2xl font-bold text-gray-900">{allChanges.length}</p>
+              <p className="text-xs text-gray-400 mt-0.5">total signals detected</p>
             </div>
           </div>
         </div>

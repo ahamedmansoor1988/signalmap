@@ -57,7 +57,7 @@ export default async function ChangeDetailPage({ params }: { params: { id: strin
           className="flex items-center gap-1.5 text-gray-400 text-sm hover:text-gray-700 transition-colors mb-6"
         >
           <ArrowLeft className="w-3.5 h-3.5" />
-          Change Explorer
+          Signal Inbox
         </Link>
 
         {/* Header */}

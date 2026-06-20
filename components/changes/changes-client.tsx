@@ -19,7 +19,7 @@ type Change = Database['public']['Tables']['changes']['Row'] & {
   structured_diff?: unknown
 }
 
-const THEME_PILLS = ['All', 'Pricing', 'Messaging', 'Product', 'Home', 'Hiring'] as const
+const THEME_PILLS = ['All', 'AI Features', 'Pricing', 'Enterprise', 'GTM', 'Content'] as const
 
 function getDateGroup(dateStr: string): string {
   const now = new Date()

@@ -224,7 +224,7 @@ export default function CompetitorsPage() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
                         <a
-                          href={`/battle/${c.id}`}
+                          href={`/competitor/${c.id}`}
                           className="text-gray-900 font-semibold text-sm hover:text-violet-700 transition-colors"
                         >
                           {c.name}

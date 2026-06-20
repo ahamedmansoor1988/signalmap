@@ -146,7 +146,7 @@ export default async function BriefPage() {
             <BarChart3 className="w-8 h-8 text-gray-300 mx-auto mb-3" />
             <p className="text-gray-500 text-sm font-medium">No brief yet</p>
             <p className="text-gray-400 text-xs mt-1 max-w-xs mx-auto">
-              The first Weekly Executive Brief will be generated next Monday at 9am UTC, or you can trigger it manually via the API.
+              Your first brief will appear here next Monday. Make sure you have competitors tracked and signals detected first.
             </p>
           </div>
         ) : (
