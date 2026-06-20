@@ -56,11 +56,17 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
     })
     .join('\n\n')
 
-  const result = await callClaudeJSON<InsightsResult>(
-    COMPETITOR_PROFILE_SYSTEM,
-    `Competitor: ${competitor.name}\nWebsite: ${competitor.website}\n\n${context}`,
-    512
-  )
+  let result: InsightsResult
+  try {
+    result = await callClaudeJSON<InsightsResult>(
+      COMPETITOR_PROFILE_SYSTEM,
+      `Competitor: ${competitor.name}\nWebsite: ${competitor.website}\n\n${context}`,
+      512
+    )
+  } catch (err) {
+    console.error('[competitor-insights] summary generation failed:', err)
+    return NextResponse.json({ error: 'AI generation failed — try again shortly' }, { status: 503 })
+  }
 
   // Fetch company profile for personalized actions
   const { data: profile } = await supabase
@@ -69,11 +75,13 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
     .eq('org_id', competitor.org_id)
     .maybeSingle()
 
-  const typedActions = await generateTypedActions(
-    profile ?? null,
-    competitor.name,
-    context
-  )
+  let typedActions: Awaited<ReturnType<typeof generateTypedActions>> = []
+  try {
+    typedActions = await generateTypedActions(profile ?? null, competitor.name, context)
+  } catch (err) {
+    console.error('[competitor-insights] actions generation failed:', err)
+    // Proceed without actions rather than failing the whole request
+  }
 
   await supabase
     .from('competitors')

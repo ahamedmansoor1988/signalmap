@@ -1,13 +1,11 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect, notFound } from 'next/navigation'
-import { callClaudeJSON } from '@/lib/ai'
-import { BATTLE_SYSTEM } from '@/lib/prompts/battle'
 import CompetitorLogo from '@/components/ui/competitor-logo'
 import ShareButton from '@/components/ui/share-button'
-import { getTypeStyle } from '@/lib/typed-actions'
+import BattleAISections from '@/components/battle/battle-ai-sections'
 import { THEME_CONFIG } from '@/components/map/mock-data'
 import type { Theme } from '@/components/map/mock-data'
-import { Swords, CheckCircle2, XCircle, ArrowLeft, Clock } from 'lucide-react'
+import { Swords, ArrowLeft, Clock } from 'lucide-react'
 import Link from 'next/link'
 
 export const dynamic = 'force-dynamic'
@@ -19,11 +17,6 @@ interface HomepageData {
   target_customer?: string
   key_themes?: string[]
   summary?: string
-}
-
-interface BattleAnalysis {
-  feature_gaps: Array<{ feature: string; us: boolean; them: boolean }>
-  battle_actions: Array<{ type: string; action: string }>
 }
 
 function ThreatGauge({ score }: { score: number }) {
@@ -70,21 +63,12 @@ function timeAgo(date: string): string {
   return 'just now'
 }
 
-function DiffBadge({ changeType }: { changeType: string }) {
-  const type = changeType.toLowerCase()
-  const styles: Record<string, string> = {
-    pricing:    'bg-amber-50 text-amber-700 border-amber-200',
-    messaging:  'bg-violet-50 text-violet-700 border-violet-200',
-    features:   'bg-blue-50 text-blue-700 border-blue-200',
-    enterprise: 'bg-indigo-50 text-indigo-700 border-indigo-200',
-    content:    'bg-emerald-50 text-emerald-700 border-emerald-200',
-  }
-  const cls = styles[type] ?? 'bg-gray-50 text-gray-600 border-gray-200'
-  return (
-    <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded border shrink-0 capitalize ${cls}`}>
-      {changeType}
-    </span>
-  )
+const CHANGE_TYPE_STYLES: Record<string, string> = {
+  pricing:    'bg-amber-50 text-amber-700 border-amber-200',
+  messaging:  'bg-violet-50 text-violet-700 border-violet-200',
+  features:   'bg-blue-50 text-blue-700 border-blue-200',
+  enterprise: 'bg-indigo-50 text-indigo-700 border-indigo-200',
+  content:    'bg-emerald-50 text-emerald-700 border-emerald-200',
 }
 
 export default async function BattleRoomPage({
@@ -140,40 +124,34 @@ export default async function BattleRoomPage({
   const homepageData = (snapshots?.[0]?.parsed_data ?? null) as HomepageData | null
   const recentDiffs = diffs ?? []
 
-  let analysis: BattleAnalysis = { feature_gaps: [], battle_actions: [] }
-  try {
-    const userMessage = JSON.stringify({
-      our_company: {
-        name: profile?.company_name ?? 'Our Company',
-        icp: profile?.icp ?? '',
-        differentiators: profile?.differentiators ?? '',
-        description: profile?.description ?? '',
-      },
-      competitor: {
-        name: competitor.name,
-        hero_headline: homepageData?.hero_headline ?? '',
-        target_customer: homepageData?.target_customer ?? '',
-        key_themes: homepageData?.key_themes ?? [],
-        summary: homepageData?.summary ?? competitor.ai_summary ?? '',
-      },
-      recent_changes: recentDiffs.map(d => `${d.change_type}: ${d.summary ?? 'Change detected'}`),
-    })
-    analysis = await callClaudeJSON<BattleAnalysis>(BATTLE_SYSTEM, userMessage, 1400)
-  } catch {
-    // Render page with empty AI sections if generation fails
-  }
-
   const ourName = profile?.company_name ?? 'Your Company'
   const ourDifferentiators = (profile?.differentiators ?? '')
     .split(/[,\n•·]/)
     .map(s => s.trim())
     .filter(Boolean)
 
+  // Props for the client AI component
+  const aiProfile = {
+    company_name: profile?.company_name ?? '',
+    icp: profile?.icp ?? '',
+    differentiators: profile?.differentiators ?? '',
+    description: profile?.description ?? '',
+  }
+  const aiHomepage = {
+    hero_headline: homepageData?.hero_headline ?? '',
+    target_customer: homepageData?.target_customer ?? '',
+    key_themes: homepageData?.key_themes ?? [],
+    summary: homepageData?.summary ?? competitor.ai_summary ?? '',
+  }
+  const aiRecentChanges = recentDiffs.map(
+    d => `${d.change_type}: ${d.summary ?? 'Change detected'}`
+  )
+
   return (
     <div className="h-full overflow-y-auto">
       <div className="max-w-3xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
 
-        {/* Top bar: back link + share */}
+        {/* Top bar */}
         <div className="flex items-center justify-between mb-6">
           <Link
             href="/map"
@@ -222,7 +200,6 @@ export default async function BattleRoomPage({
               <h2 className="text-gray-700 text-sm font-semibold">Messaging</h2>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 sm:divide-x divide-gray-100 divide-y sm:divide-y-0">
-              {/* Our side */}
               <div className="p-4 sm:p-5">
                 <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-3 sm:mb-4">
                   {ourName}
@@ -233,12 +210,14 @@ export default async function BattleRoomPage({
                     <p className="text-gray-800 text-sm font-medium leading-snug">
                       {profile?.description
                         ? (profile.description.split(/[.!?]/)[0] ?? profile.description) + '.'
-                        : '—'}
+                        : <span className="text-gray-400 italic font-normal">Not set — add in Settings</span>}
                     </p>
                   </div>
                   <div>
                     <p className="text-[11px] text-gray-400 mb-1">ICP</p>
-                    <p className="text-gray-700 text-sm leading-snug">{profile?.icp || '—'}</p>
+                    <p className="text-gray-700 text-sm leading-snug">
+                      {profile?.icp || <span className="text-gray-400 italic">Not set</span>}
+                    </p>
                   </div>
                   <div>
                     <p className="text-[11px] text-gray-400 mb-1.5">Key Differentiators</p>
@@ -252,13 +231,12 @@ export default async function BattleRoomPage({
                         ))}
                       </ul>
                     ) : (
-                      <p className="text-gray-400 text-sm">—</p>
+                      <p className="text-gray-400 text-sm italic text-xs">Not set</p>
                     )}
                   </div>
                 </div>
               </div>
 
-              {/* Their side */}
               <div className="p-4 sm:p-5">
                 <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-3 sm:mb-4">
                   {competitor.name}
@@ -267,20 +245,20 @@ export default async function BattleRoomPage({
                   <div>
                     <p className="text-[11px] text-gray-400 mb-1">Hero Headline</p>
                     <p className="text-gray-800 text-sm font-medium leading-snug">
-                      {homepageData?.hero_headline || '—'}
+                      {homepageData?.hero_headline || <span className="text-gray-400 italic font-normal">No snapshot yet</span>}
                     </p>
                   </div>
                   <div>
                     <p className="text-[11px] text-gray-400 mb-1">ICP</p>
                     <p className="text-gray-700 text-sm leading-snug">
-                      {homepageData?.target_customer || '—'}
+                      {homepageData?.target_customer || <span className="text-gray-400 italic">No snapshot yet</span>}
                     </p>
                   </div>
                   <div>
                     <p className="text-[11px] text-gray-400 mb-1.5">Key Themes</p>
                     {(homepageData?.key_themes?.length ?? 0) > 0 ? (
                       <ul className="space-y-1">
-                        {(homepageData!.key_themes!).slice(0, 4).map((t, i) => (
+                        {homepageData!.key_themes!.slice(0, 4).map((t, i) => (
                           <li key={i} className="flex items-start gap-1.5">
                             <span className="text-amber-400 shrink-0 mt-0.5 text-xs">•</span>
                             <span className="text-gray-700 text-sm leading-snug">{t}</span>
@@ -289,7 +267,8 @@ export default async function BattleRoomPage({
                       </ul>
                     ) : (
                       <p className="text-gray-700 text-sm leading-snug">
-                        {homepageData?.summary || competitor.ai_summary || '—'}
+                        {homepageData?.summary || competitor.ai_summary ||
+                          <span className="text-gray-400 italic">No snapshot yet — trigger cron to populate</span>}
                       </p>
                     )}
                   </div>
@@ -298,50 +277,15 @@ export default async function BattleRoomPage({
             </div>
           </div>
 
-          {/* 2. Feature Gaps */}
-          {analysis.feature_gaps.length > 0 && (
-            <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
-              <div className="px-4 sm:px-5 py-3.5 border-b border-gray-100">
-                <h2 className="text-gray-700 text-sm font-semibold">Feature Gaps</h2>
-              </div>
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[360px]">
-                  <thead>
-                    <tr className="border-b border-gray-100">
-                      <th className="text-left text-[11px] text-gray-400 font-medium px-4 sm:px-5 py-3 w-1/2">
-                        Feature
-                      </th>
-                      <th className="text-center text-[11px] text-gray-400 font-medium px-3 sm:px-4 py-3 w-1/4">
-                        <span className="hidden sm:inline">{ourName}</span>
-                        <span className="sm:hidden">You</span>
-                      </th>
-                      <th className="text-center text-[11px] text-gray-400 font-medium px-3 sm:px-4 py-3 w-1/4">
-                        <span className="hidden sm:inline">{competitor.name}</span>
-                        <span className="sm:hidden">Them</span>
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-50">
-                    {analysis.feature_gaps.map((row, i) => (
-                      <tr key={i} className="hover:bg-gray-50/60 transition-colors">
-                        <td className="px-4 sm:px-5 py-3 text-gray-700 text-sm">{row.feature}</td>
-                        <td className="px-3 sm:px-4 py-3 text-center">
-                          {row.us
-                            ? <CheckCircle2 className="w-4 h-4 text-emerald-500 mx-auto" />
-                            : <XCircle className="w-4 h-4 text-gray-200 mx-auto" />}
-                        </td>
-                        <td className="px-3 sm:px-4 py-3 text-center">
-                          {row.them
-                            ? <CheckCircle2 className="w-4 h-4 text-emerald-500 mx-auto" />
-                            : <XCircle className="w-4 h-4 text-gray-200 mx-auto" />}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
+          {/* 2 & 5. Feature Gaps + Battle Actions — loaded client-side to avoid timeout */}
+          <BattleAISections
+            competitorId={competitor.id}
+            ourName={ourName}
+            competitorName={competitor.name}
+            profile={aiProfile}
+            homepage={aiHomepage}
+            recentChanges={aiRecentChanges}
+          />
 
           {/* 3. Threat Level */}
           <div className="bg-white border border-gray-200 rounded-xl p-4 sm:p-5 shadow-sm">
@@ -349,7 +293,7 @@ export default async function BattleRoomPage({
             <div className="flex flex-col sm:flex-row items-center sm:items-start gap-5 sm:gap-8">
               <ThreatGauge score={competitor.risk_score} />
               <div className="text-center sm:text-left">
-                <p className={`text-2xl font-bold mb-1 ${
+                <p className={`text-2xl font-bold mb-1.5 ${
                   competitor.risk_score >= 75 ? 'text-red-500' :
                   competitor.risk_score >= 50 ? 'text-amber-500' :
                   'text-emerald-500'
@@ -369,26 +313,25 @@ export default async function BattleRoomPage({
           </div>
 
           {/* 4. Recent Moves */}
-          {recentDiffs.length > 0 && (
-            <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
-              <div className="px-4 sm:px-5 py-3.5 border-b border-gray-100 flex items-center justify-between">
-                <h2 className="text-gray-700 text-sm font-semibold">Recent Moves</h2>
-                <Link href="/changes" className="text-xs text-violet-600 hover:text-violet-700 transition-colors">
-                  View all →
-                </Link>
-              </div>
+          <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+            <div className="px-4 sm:px-5 py-3.5 border-b border-gray-100 flex items-center justify-between">
+              <h2 className="text-gray-700 text-sm font-semibold">Recent Moves</h2>
+              <Link href="/changes" className="text-xs text-violet-600 hover:text-violet-700 transition-colors">
+                View all →
+              </Link>
+            </div>
+            {recentDiffs.length > 0 ? (
               <div className="p-3 sm:p-4 space-y-2.5">
                 {recentDiffs.map((diff) => {
                   const themeKey = Object.keys(THEME_CONFIG).find(
                     k => k.toLowerCase() === diff.change_type?.toLowerCase()
                   ) as Theme | undefined
                   const cfg = themeKey ? THEME_CONFIG[themeKey] : null
+                  const cls = CHANGE_TYPE_STYLES[diff.change_type?.toLowerCase()] ??
+                    'bg-gray-50 text-gray-600 border-gray-200'
 
                   return (
-                    <div
-                      key={diff.id}
-                      className="bg-gray-50 border border-gray-100 rounded-xl p-3 sm:p-4"
-                    >
+                    <div key={diff.id} className="bg-gray-50 border border-gray-100 rounded-xl p-3 sm:p-4">
                       <div className="flex items-center gap-2 mb-2">
                         {cfg ? (
                           <span
@@ -398,7 +341,9 @@ export default async function BattleRoomPage({
                             {diff.change_type}
                           </span>
                         ) : (
-                          <DiffBadge changeType={diff.change_type} />
+                          <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded border shrink-0 capitalize ${cls}`}>
+                            {diff.change_type}
+                          </span>
                         )}
                         <span className="flex items-center gap-1 text-gray-400 text-xs ml-auto shrink-0">
                           <Clock className="w-3 h-3" />
@@ -412,60 +357,14 @@ export default async function BattleRoomPage({
                   )
                 })}
               </div>
-            </div>
-          )}
-
-          {recentDiffs.length === 0 && (
-            <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
-              <div className="px-4 sm:px-5 py-3.5 border-b border-gray-100">
-                <h2 className="text-gray-700 text-sm font-semibold">Recent Moves</h2>
-              </div>
+            ) : (
               <div className="px-4 sm:px-5 py-6 text-center">
-                <p className="text-gray-400 text-sm">No changes detected yet — the cron job runs daily at 8am UTC.</p>
+                <p className="text-gray-400 text-sm">
+                  No changes detected yet — the cron job runs daily at 9am UTC.
+                </p>
               </div>
-            </div>
-          )}
-
-          {/* 5. Suggested Battle Actions */}
-          {analysis.battle_actions.length > 0 && (
-            <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
-              <div className="px-4 sm:px-5 py-3.5 border-b border-gray-100">
-                <h2 className="text-gray-700 text-sm font-semibold">Suggested Battle Actions</h2>
-              </div>
-              <div className="p-4 sm:p-5 space-y-2">
-                {analysis.battle_actions.map((action, i) => {
-                  const style = getTypeStyle(action.type)
-                  return (
-                    <div
-                      key={i}
-                      className="flex items-start gap-2.5 bg-gray-50 rounded-lg p-3 border border-gray-100"
-                    >
-                      {style && (
-                        <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded border shrink-0 mt-0.5 ${style.cls}`}>
-                          {style.label}
-                        </span>
-                      )}
-                      <span className="text-gray-700 text-sm leading-snug">{action.action}</span>
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
-          )}
-
-          {analysis.battle_actions.length === 0 && (
-            <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
-              <div className="px-4 sm:px-5 py-3.5 border-b border-gray-100">
-                <h2 className="text-gray-700 text-sm font-semibold">Suggested Battle Actions</h2>
-              </div>
-              <div className="px-4 sm:px-5 py-6 text-center">
-                <p className="text-gray-400 text-sm">Add your company profile in Settings to generate personalized battle actions.</p>
-                <Link href="/settings" className="text-xs text-violet-600 hover:text-violet-700 mt-2 inline-block transition-colors">
-                  Go to Settings →
-                </Link>
-              </div>
-            </div>
-          )}
+            )}
+          </div>
 
         </div>
       </div>

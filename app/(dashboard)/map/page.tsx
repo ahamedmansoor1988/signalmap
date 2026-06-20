@@ -6,6 +6,7 @@ import { redirect } from 'next/navigation'
 import { normalizeActions } from '@/lib/typed-actions'
 import type { Json } from '@/lib/supabase/types'
 
+export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Market Map — SignalMap' }
 
 export default async function MapPage() {
