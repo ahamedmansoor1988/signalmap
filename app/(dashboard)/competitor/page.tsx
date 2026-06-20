@@ -1,59 +1,51 @@
-import { createClient } from '@/lib/supabase/server'
-import { redirect } from 'next/navigation'
+'use client'
+
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { ExternalLink, TrendingUp, Users } from 'lucide-react'
 
-export const metadata = { title: 'Competitors — SignalMap' }
+type CompetitorRow = {
+  id: string
+  name: string
+  website: string
+  risk_score: number
+  created_at: string
+}
 
-export default async function CompetitorsPage() {
-  const supabase = await createClient()
+export default function CompetitorsPage() {
+  const [competitors, setCompetitors] = useState<CompetitorRow[] | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-  let user = null
-  try {
-    const result = await supabase.auth.getUser()
-    user = result.data?.user ?? null
-  } catch {
-    // auth service unavailable
-  }
-  if (!user) redirect('/login')
+  useEffect(() => {
+    fetch('/api/competitors')
+      .then(r => r.json())
+      .then(data => {
+        if (data.error) setError(data.error)
+        else setCompetitors(data.competitors ?? [])
+      })
+      .catch(e => setError(e.message))
+      .finally(() => setLoading(false))
+  }, [])
 
-  const { data: membership } = await supabase
-    .from('org_members')
-    .select('org_id')
-    .eq('user_id', user.id)
-    .maybeSingle()
-
-  if (!membership) redirect('/settings')
-
-  type CompetitorRow = {
-    id: string
-    name: string
-    website: string
-    risk_score: number
-    created_at: string
-    page_count?: number
-  }
-  let competitors: CompetitorRow[] | null = null
-  let loadError = false
-  try {
-    const { data, error } = await supabase
-      .from('competitors')
-      .select('id, name, website, risk_score, created_at')
-      .eq('org_id', membership.org_id)
-      .order('risk_score', { ascending: false })
-    if (error) console.error('[competitors] query error:', error)
-    competitors = data
-  } catch (err) {
-    console.error('[competitors] failed to load:', err)
-    loadError = true
+  if (loading) {
+    return (
+      <div className="h-full flex items-center justify-center">
+        <div className="space-y-3 w-full max-w-3xl px-6">
+          {[1,2,3].map(i => (
+            <div key={i} className="h-16 bg-gray-100 rounded-xl animate-pulse" />
+          ))}
+        </div>
+      </div>
+    )
   }
 
-  if (loadError) {
+  if (error) {
     return (
       <div className="h-full flex items-center justify-center">
         <div className="text-center">
-          <p className="text-gray-900 font-semibold mb-1">Something went wrong</p>
-          <p className="text-gray-400 text-sm">Could not load competitors. Try refreshing.</p>
+          <p className="text-gray-900 font-semibold mb-1">Could not load competitors</p>
+          <p className="text-gray-400 text-sm">{error}</p>
         </div>
       </div>
     )
@@ -88,11 +80,11 @@ export default async function CompetitorsPage() {
         ) : (
           <div className="space-y-3">
             {competitors.map((c) => {
-              const riskLevel = c.risk_score >= 75 ? 'High' : c.risk_score >= 50 ? 'Medium' : 'Low'
+              const riskLevel = c.risk_score >= 75 ? 'High' : c.risk_score >= 45 ? 'Medium' : 'Low'
               const riskColors = {
-                High: 'text-red-600 bg-red-50',
+                High:   'text-red-600 bg-red-50',
                 Medium: 'text-amber-600 bg-amber-50',
-                Low: 'text-emerald-600 bg-emerald-50',
+                Low:    'text-emerald-600 bg-emerald-50',
               }
               return (
                 <Link
@@ -102,21 +94,16 @@ export default async function CompetitorsPage() {
                 >
                   <div>
                     <p className="text-gray-900 font-medium text-sm">{c.name}</p>
-                    <div className="flex items-center gap-3 mt-1">
-                      <a
-                        href={c.website}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        onClick={(e) => e.stopPropagation()}
-                        className="flex items-center gap-1 text-gray-400 text-xs hover:text-gray-600 transition-colors"
-                      >
-                        {c.website.replace(/^https?:\/\//, '')}
-                        <ExternalLink className="w-3 h-3" />
-                      </a>
-                      <span className="text-gray-300 text-xs">
-                        tracked
-                      </span>
-                    </div>
+                    <a
+                      href={c.website}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={(e) => e.stopPropagation()}
+                      className="flex items-center gap-1 text-gray-400 text-xs hover:text-gray-600 transition-colors mt-1"
+                    >
+                      {c.website.replace(/^https?:\/\//, '')}
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
                   </div>
                   <div className="flex items-center gap-3">
                     <div className="flex items-center gap-1 text-gray-400 text-xs">
