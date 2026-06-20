@@ -35,10 +35,10 @@ const SVG_W    = 1200
 const SVG_H    = 860
 const CX       = SVG_W / 2   // 600
 const CY       = SVG_H / 2 + 20  // shift down slightly for title
-const THEME_R  = 110          // themes tight to center
+const THEME_R  = 220          // themes spread out from center
 const NODE_R   = 20           // competitor circle radius (40px diameter)
-const THEME_W  = 118          // theme card width
-const THEME_H  = 50           // theme card height
+const THEME_W  = 130          // theme card width
+const THEME_H  = 52           // theme card height
 const THEME_RX = 10           // card corner radius
 // Single-arc and 2-row layout distances (defined in computeLayout below)
 
@@ -81,9 +81,9 @@ function computeLayout(competitors: MapCompetitor[]) {
     const py =  Math.cos(tp.angle)
 
     if (Nc <= 4) {
-      // Single arc: fan up to 70° around the radial direction
-      const ARC_R  = 200
-      const spread = Math.min((Nc - 1) * 0.44, 1.22) // max ~70°
+      // Single arc: fan competitors outward from theme node
+      const ARC_R  = 160
+      const spread = Math.min((Nc - 1) * 0.44, 1.22)
       const step   = Nc > 1 ? spread / (Nc - 1) : 0
       group.forEach((comp, i) => {
         const a = tp.angle - spread / 2 + i * step
@@ -93,10 +93,10 @@ function computeLayout(competitors: MapCompetitor[]) {
         })
       })
     } else {
-      // 2-row grid: row 1 closer to theme, row 2 farther out
-      const ROW1   = 190   // radial distance to row 1
-      const ROW2   = 260   // radial distance to row 2
-      const SPACING = 52   // lateral gap between nodes (NODE_R*2 + 12px clearance)
+      // 2-row grid
+      const ROW1   = 150
+      const ROW2   = 220
+      const SPACING = 56
       const N1 = Math.ceil(Nc / 2)
       const N2 = Nc - N1
       for (let i = 0; i < N1; i++) {

@@ -31,19 +31,17 @@ export default async function CompetitorsPage() {
     website: string
     risk_score: number
     created_at: string
-    tracked_pages: Array<{ id: string }> | null
+    page_count?: number
   }
   let competitors: CompetitorRow[] | null = null
   let loadError = false
   try {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('competitors')
-      .select(`
-        id, name, website, risk_score, created_at,
-        tracked_pages(id)
-      `)
+      .select('id, name, website, risk_score, created_at')
       .eq('org_id', membership.org_id)
       .order('risk_score', { ascending: false })
+    if (error) console.error('[competitors] query error:', error)
     competitors = data
   } catch (err) {
     console.error('[competitors] failed to load:', err)
@@ -116,7 +114,7 @@ export default async function CompetitorsPage() {
                         <ExternalLink className="w-3 h-3" />
                       </a>
                       <span className="text-gray-300 text-xs">
-                        {(c.tracked_pages ?? []).length} pages tracked
+                        tracked
                       </span>
                     </div>
                   </div>
