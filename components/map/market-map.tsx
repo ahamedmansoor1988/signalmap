@@ -80,37 +80,17 @@ function computeLayout(competitors: MapCompetitor[]) {
     const px = -Math.sin(tp.angle)
     const py =  Math.cos(tp.angle)
 
-    // Place competitors laterally around the theme node (perpendicular to radial)
-    // with a slight push outward so they don't overlap the theme card
-    const RADIAL_PUSH = 120  // how far outward from theme center
-    const SPACING     = 54   // lateral gap between competitors
-
-    if (Nc <= 4) {
-      group.forEach((comp, i) => {
-        const lat = (i - (Nc - 1) / 2) * SPACING
-        compPos.set(comp.id, {
-          x: tp.x + RADIAL_PUSH * rx + lat * px,
-          y: tp.y + RADIAL_PUSH * ry + lat * py,
-        })
+    // Orbit competitors evenly around their theme card in a full circle
+    const ORBIT_R = 110  // radius of the orbit ring around theme center
+    // Start angle offset so competitors don't overlap center<->origin line
+    const startAngle = tp.angle + Math.PI / 2
+    group.forEach((comp, i) => {
+      const a = startAngle + (i / Nc) * 2 * Math.PI
+      compPos.set(comp.id, {
+        x: tp.x + ORBIT_R * Math.cos(a),
+        y: tp.y + ORBIT_R * Math.sin(a),
       })
-    } else {
-      const N1 = Math.ceil(Nc / 2)
-      const N2 = Nc - N1
-      for (let i = 0; i < N1; i++) {
-        const lat = (i - (N1 - 1) / 2) * SPACING
-        compPos.set(group[i].id, {
-          x: tp.x + RADIAL_PUSH * rx + lat * px,
-          y: tp.y + RADIAL_PUSH * ry + lat * py,
-        })
-      }
-      for (let i = 0; i < N2; i++) {
-        const lat = (i - (N2 - 1) / 2) * SPACING
-        compPos.set(group[N1 + i].id, {
-          x: tp.x + (RADIAL_PUSH + 65) * rx + lat * px,
-          y: tp.y + (RADIAL_PUSH + 65) * ry + lat * py,
-        })
-      }
-    }
+    })
   }
 
   return { themePos, compPos, activeThemes }
@@ -233,27 +213,7 @@ export default function MarketMap({ competitors, isLiveData }: Props) {
 
           <g transform={transform}>
 
-            {/* ── Connecting lines ── */}
-            {activeThemes.map(theme => {
-              const tp  = themePos.get(theme)!
-              const cfg = THEME_CONFIG[theme]
-              return competitors
-                .filter(c => c.theme === theme)
-                .map(c => {
-                  const cp = compPos.get(c.id)
-                  if (!cp) return null
-                  return (
-                    <line
-                      key={c.id}
-                      x1={tp.x} y1={tp.y}
-                      x2={cp.x} y2={cp.y}
-                      stroke={cfg.color}
-                      strokeWidth={1}
-                      strokeOpacity={visible(c) ? 0.28 : 0.04}
-                    />
-                  )
-                })
-            })}
+            {/* lines removed — competitors orbit theme cards directly */}
 
             {/* ── Theme cards ── */}
             {activeThemes.map(theme => {
