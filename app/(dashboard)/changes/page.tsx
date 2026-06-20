@@ -25,31 +25,47 @@ export default async function ChangesPage() {
     )
   }
 
-  const { data: changes } = await supabase
-    .from('changes')
-    .select(`
-      *,
-      tracked_pages(
-        url, label,
-        competitors!inner(id, name, org_id, website)
-      )
-    `)
-    .eq('tracked_pages.competitors.org_id', membership.org_id)
-    .order('detected_at', { ascending: false })
-    .limit(50)
+  // Resolve org → competitor IDs → page IDs, then query changes directly
+  const { data: orgCompetitors } = await supabase
+    .from('competitors')
+    .select('id')
+    .eq('org_id', membership.org_id)
 
-  const safeChanges = changes ?? []
+  const competitorIds = (orgCompetitors ?? []).map(c => c.id)
+
+  const { data: orgPages } = await supabase
+    .from('tracked_pages')
+    .select('id, url, label, competitor_id, competitors(id, name, website)')
+    .in('competitor_id', competitorIds)
+
+  const pageIds = (orgPages ?? []).map(p => p.id)
+  const pageMap = Object.fromEntries((orgPages ?? []).map(p => [p.id, p]))
+
+  const { data: rawChanges } = await supabase
+    .from('changes')
+    .select('*')
+    .in('tracked_page_id', pageIds)
+    .order('detected_at', { ascending: false })
+    .limit(100)
+
+  // Attach tracked_pages (with competitor) to each change to match expected shape
+  const changes = (rawChanges ?? []).map(c => ({
+    ...c,
+    tracked_pages: pageMap[c.tracked_page_id] ?? null,
+  }))
+
+  const safeChanges = changes
 
   // Fetch structured diffs from competitor_diffs for the same pages
-  const pageIds = Array.from(new Set(safeChanges.map((c) => c.tracked_page_id)))
+  const diffPageIds = Array.from(new Set(safeChanges.map((c) => c.tracked_page_id)))
   const diffsMap = new Map<string, StructuredDiff>()
 
-  if (pageIds.length) {
+  if (diffPageIds.length) {
     const since = safeChanges.at(-1)?.detected_at ?? new Date(0).toISOString()
     const { data: diffs } = await supabase
       .from('competitor_diffs')
       .select('tracked_page_id, old_value, new_value, change_type, detected_at')
-      .in('tracked_page_id', pageIds)
+      .in('tracked_page_id', diffPageIds)
       .gte('detected_at', since)
       .order('detected_at', { ascending: false })
 
