@@ -15,6 +15,7 @@ export interface MapCompetitor {
   last_signal: string
   signals_count: number
   description: string
+  activity_count?: number
 }
 
 interface Props {
@@ -246,6 +247,23 @@ export default function MarketMap({ competitors, isLiveData }: Props) {
           ctx.fillText(`${node.risk_score}`, 0, r + 12)
         }
 
+        // Activity dot — top-right corner of bubble
+        const ac = node.activity_count ?? 0
+        if (ac > 0) {
+          const dotColor = ac >= 6 ? '#EF4444' : ac >= 3 ? '#F97316' : '#F59E0B'
+          const dotX = r * 0.72
+          const dotY = -r * 0.72
+          ctx.shadowBlur = 0
+          ctx.beginPath()
+          ctx.arc(dotX, dotY, 5, 0, Math.PI * 2)
+          ctx.fillStyle = '#ffffff'
+          ctx.fill()
+          ctx.beginPath()
+          ctx.arc(dotX, dotY, 3.5, 0, Math.PI * 2)
+          ctx.fillStyle = dotColor
+          ctx.fill()
+        }
+
         ctx.restore()
       })
 
@@ -358,7 +376,7 @@ export default function MarketMap({ competitors, isLiveData }: Props) {
 
         <div className="absolute bottom-4 left-4 bg-white border border-gray-200 rounded-xl p-3 shadow-sm">
           <p className="text-gray-400 text-xs mb-2 font-medium uppercase tracking-wide">Node size = risk score</p>
-          <div className="flex items-end gap-2">
+          <div className="flex items-end gap-2 mb-3">
             {[30, 50, 75].map((score) => (
               <div key={score} className="flex flex-col items-center gap-1">
                 <div
@@ -366,6 +384,15 @@ export default function MarketMap({ competitors, isLiveData }: Props) {
                   style={{ width: riskToRadius(score) * 1.4, height: riskToRadius(score) * 1.4 }}
                 />
                 <span className="text-gray-400 text-xs">{score}</span>
+              </div>
+            ))}
+          </div>
+          <p className="text-gray-400 text-xs mb-1.5 font-medium uppercase tracking-wide">Activity (7d)</p>
+          <div className="flex items-center gap-3">
+            {([['#F59E0B', 'Low'], ['#F97316', 'Med'], ['#EF4444', 'High']] as const).map(([color, label]) => (
+              <div key={label} className="flex items-center gap-1">
+                <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: color }} />
+                <span className="text-gray-400 text-xs">{label}</span>
               </div>
             ))}
           </div>

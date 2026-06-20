@@ -47,6 +47,8 @@ export default async function MapPage() {
             .sort((a, b) => new Date(b.detected_at).getTime() - new Date(a.detected_at).getTime())
 
           const latestChange = allChanges[0]
+          const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+          const activityCount = allChanges.filter((ch) => new Date(ch.detected_at) >= sevenDaysAgo).length
 
           // Use theme from latest signal if available; otherwise spread evenly by index
           // so competitors don't all pile into the same cluster before cron runs
@@ -62,6 +64,7 @@ export default async function MapPage() {
             theme,
             last_signal: latestChange?.ai_signal ?? 'No signals yet — cron runs daily at 8am UTC',
             signals_count: allChanges.length,
+            activity_count: activityCount,
             description: c.ai_summary ?? `Tracking ${c.website}`,
             ai_summary: c.ai_summary ?? undefined,
             suggested_actions: normalizeActions(c.suggested_actions as Json) || undefined,
