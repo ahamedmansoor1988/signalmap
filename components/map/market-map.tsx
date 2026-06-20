@@ -32,14 +32,14 @@ interface Props {
 
 // ─── Layout constants ──────────────────────────────────────────
 const SVG_W    = 1200
-const SVG_H    = 860
-const CX       = SVG_W / 2   // 600
-const CY       = SVG_H / 2 + 20  // shift down slightly for title
-const THEME_R  = 220          // themes spread out from center
-const NODE_R   = 20           // competitor circle radius (40px diameter)
-const THEME_W  = 130          // theme card width
-const THEME_H  = 52           // theme card height
-const THEME_RX = 10           // card corner radius
+const SVG_H    = 900
+const CX       = SVG_W / 2      // 600
+const CY       = SVG_H / 2 + 60 // push center down to give title room
+const THEME_R  = 210             // themes ring radius
+const NODE_R   = 20
+const THEME_W  = 130
+const THEME_H  = 52
+const THEME_RX = 10
 // Single-arc and 2-row layout distances (defined in computeLayout below)
 
 function activityColor(count: number): string {
@@ -80,37 +80,34 @@ function computeLayout(competitors: MapCompetitor[]) {
     const px = -Math.sin(tp.angle)
     const py =  Math.cos(tp.angle)
 
+    // Place competitors laterally around the theme node (perpendicular to radial)
+    // with a slight push outward so they don't overlap the theme card
+    const RADIAL_PUSH = 120  // how far outward from theme center
+    const SPACING     = 54   // lateral gap between competitors
+
     if (Nc <= 4) {
-      // Single arc: fan competitors outward from theme node
-      const ARC_R  = 160
-      const spread = Math.min((Nc - 1) * 0.44, 1.22)
-      const step   = Nc > 1 ? spread / (Nc - 1) : 0
       group.forEach((comp, i) => {
-        const a = tp.angle - spread / 2 + i * step
+        const lat = (i - (Nc - 1) / 2) * SPACING
         compPos.set(comp.id, {
-          x: tp.x + ARC_R * Math.cos(a),
-          y: tp.y + ARC_R * Math.sin(a),
+          x: tp.x + RADIAL_PUSH * rx + lat * px,
+          y: tp.y + RADIAL_PUSH * ry + lat * py,
         })
       })
     } else {
-      // 2-row grid
-      const ROW1   = 150
-      const ROW2   = 220
-      const SPACING = 56
       const N1 = Math.ceil(Nc / 2)
       const N2 = Nc - N1
       for (let i = 0; i < N1; i++) {
         const lat = (i - (N1 - 1) / 2) * SPACING
         compPos.set(group[i].id, {
-          x: tp.x + ROW1 * rx + lat * px,
-          y: tp.y + ROW1 * ry + lat * py,
+          x: tp.x + RADIAL_PUSH * rx + lat * px,
+          y: tp.y + RADIAL_PUSH * ry + lat * py,
         })
       }
       for (let i = 0; i < N2; i++) {
         const lat = (i - (N2 - 1) / 2) * SPACING
         compPos.set(group[N1 + i].id, {
-          x: tp.x + ROW2 * rx + lat * px,
-          y: tp.y + ROW2 * ry + lat * py,
+          x: tp.x + (RADIAL_PUSH + 65) * rx + lat * px,
+          y: tp.y + (RADIAL_PUSH + 65) * ry + lat * py,
         })
       }
     }
