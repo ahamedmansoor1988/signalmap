@@ -11,11 +11,12 @@ import { Button } from '@/components/ui/button'
 
 interface Props {
   orgId: string
+  existingCount: number
 }
 
 type Step = 'describe' | 'loading' | 'select' | 'saving'
 
-export default function OnboardingClient({ orgId }: Props) {
+export default function OnboardingClient({ orgId, existingCount }: Props) {
   const router = useRouter()
   const supabase = createClient()
 
@@ -121,6 +122,21 @@ export default function OnboardingClient({ orgId }: Props) {
     setStep('saving')
 
     try {
+      // Delete all existing competitors for this org before adding new ones
+      if (existingCount > 0) {
+        const { data: existing } = await supabase
+          .from('competitors')
+          .select('id')
+          .eq('org_id', orgId)
+
+        if (existing && existing.length > 0) {
+          const ids = existing.map(c => c.id)
+          // Delete tracked_pages first (cascades to changes)
+          await supabase.from('tracked_pages').delete().in('competitor_id', ids)
+          await supabase.from('competitors').delete().in('id', ids)
+        }
+      }
+
       for (const c of toAdd) {
         const { data: comp, error: compErr } = await supabase
           .from('competitors')
@@ -176,6 +192,16 @@ export default function OnboardingClient({ orgId }: Props) {
               AI found these based on your description. Pick the ones that matter.
             </p>
           </div>
+
+          {existingCount > 0 && (
+            <div className="mb-6 flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
+              <span className="text-amber-500 text-base shrink-0 mt-0.5">⚠</span>
+              <p className="text-amber-800 text-sm leading-snug">
+                <span className="font-semibold">This will replace your {existingCount} existing competitor{existingCount !== 1 ? 's' : ''}.</span>
+                {' '}All previous signals and history will be removed. This cannot be undone.
+              </p>
+            </div>
+          )}
 
           <div className="flex items-center justify-between mb-4">
             <span className="text-gray-500 text-sm">
@@ -295,7 +321,7 @@ export default function OnboardingClient({ orgId }: Props) {
               disabled={selected.size === 0}
               className="bg-violet-600 hover:bg-violet-500 text-white gap-2"
             >
-              Add {selected.size} competitor{selected.size !== 1 ? 's' : ''}
+              {existingCount > 0 ? 'Replace with' : 'Add'} {selected.size} competitor{selected.size !== 1 ? 's' : ''}
               <ArrowRight className="w-4 h-4" />
             </Button>
             <button

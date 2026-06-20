@@ -40,5 +40,12 @@ export default async function OnboardingPage() {
     orgId = membership.org_id
   }
 
-  return <OnboardingClient orgId={orgId} />
+  const { data: existingCompetitors } = await supabase
+    .from('competitors')
+    .select('id')
+    .eq('org_id', orgId)
+
+  const existingCount = existingCompetitors?.length ?? 0
+
+  return <OnboardingClient orgId={orgId} existingCount={existingCount} />
 }
