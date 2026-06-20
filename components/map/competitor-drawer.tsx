@@ -337,14 +337,22 @@ export default function CompetitorDrawer({ competitor, open, onClose }: {
                   <Zap className="w-4 h-4 text-amber-500" />
                   <span className="text-gray-700 text-sm font-medium">Live Scan</span>
                 </div>
-                <button
-                  onClick={handleScan}
-                  disabled={scanning}
-                  className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg bg-violet-50 text-violet-600 hover:bg-violet-100 border border-violet-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <RefreshCw className={`w-3 h-3 ${scanning ? 'animate-spin' : ''}`} />
-                  {scanning ? 'Scanning…' : 'Scan now'}
-                </button>
+                <div className="flex items-center gap-2">
+                  <Link
+                    href={`/battle/${competitor.id}`}
+                    className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg bg-gray-50 text-gray-600 hover:bg-gray-100 border border-gray-200 transition-colors"
+                  >
+                    ⚔️ Battle Room
+                  </Link>
+                  <button
+                    onClick={handleScan}
+                    disabled={scanning}
+                    className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg bg-violet-50 text-violet-600 hover:bg-violet-100 border border-violet-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <RefreshCw className={`w-3 h-3 ${scanning ? 'animate-spin' : ''}`} />
+                    {scanning ? 'Scanning…' : 'Scan now'}
+                  </button>
+                </div>
               </div>
 
               {!scanning && !scanPages && !scanError && (
