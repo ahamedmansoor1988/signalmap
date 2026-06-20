@@ -264,13 +264,19 @@ export default async function BattleRoomPage({
                   <div>
                     <p className="text-[11px] text-gray-400 mb-1">Hero Headline</p>
                     <p className="text-gray-800 text-sm font-medium leading-snug">
-                      {homepageData?.hero_headline || <span className="text-gray-400 italic font-normal">No snapshot yet</span>}
+                      {homepageData?.hero_headline ||
+                        (competitor.ai_summary
+                          ? (competitor.ai_summary.split(/[.!?]/)[0]?.trim() ?? competitor.ai_summary)
+                          : <span className="text-gray-400 italic font-normal">No snapshot yet — cron populates this</span>)}
                     </p>
                   </div>
                   <div>
                     <p className="text-[11px] text-gray-400 mb-1">ICP</p>
                     <p className="text-gray-700 text-sm leading-snug">
-                      {homepageData?.target_customer || <span className="text-gray-400 italic">No snapshot yet</span>}
+                      {homepageData?.target_customer ||
+                        (competitor.ai_summary
+                          ? competitor.ai_summary.split(/[.!?]/)[1]?.trim() ?? ''
+                          : <span className="text-gray-400 italic">No snapshot yet</span>)}
                     </p>
                   </div>
                   <div>

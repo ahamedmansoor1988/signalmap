@@ -61,7 +61,8 @@ export default function BattleAISections({
         </div>
         <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
           <div className="px-4 sm:px-5 py-3.5 border-b border-gray-100 flex items-center gap-2">
-            <h2 className="text-gray-700 text-sm font-semibold">Suggested Battle Actions</h2>
+            <span className="text-violet-500 font-bold text-sm">→</span>
+            <h2 className="text-gray-700 text-sm font-semibold">Recommended Actions</h2>
             <span className="text-gray-400 text-xs">Generating…</span>
           </div>
           <div className="p-4 sm:p-5 space-y-2">
@@ -120,20 +121,21 @@ export default function BattleAISections({
       {/* Battle Actions */}
       {(analysis?.battle_actions.length ?? 0) > 0 ? (
         <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
-          <div className="px-4 sm:px-5 py-3.5 border-b border-gray-100">
-            <h2 className="text-gray-700 text-sm font-semibold">Suggested Battle Actions</h2>
+          <div className="px-4 sm:px-5 py-3.5 border-b border-gray-100 flex items-center gap-2">
+            <span className="text-violet-500 font-bold text-sm">→</span>
+            <h2 className="text-gray-700 text-sm font-semibold">Recommended Actions</h2>
           </div>
-          <div className="p-4 sm:p-5 space-y-2">
+          <div className="p-4 sm:p-5 space-y-3">
             {analysis!.battle_actions.map((action, i) => {
               const style = getTypeStyle(action.type)
               return (
-                <div key={i} className="flex items-start gap-2.5 bg-gray-50 rounded-lg p-3 border border-gray-100">
+                <div key={i} className="bg-gray-50 rounded-xl p-4 border border-gray-100">
                   {style && (
-                    <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded border shrink-0 mt-0.5 ${style.cls}`}>
+                    <span className={`text-[10px] font-semibold px-2 py-0.5 rounded border inline-block mb-2 ${style.cls}`}>
                       {style.label}
                     </span>
                   )}
-                  <span className="text-gray-700 text-sm leading-snug">{action.action}</span>
+                  <p className="text-gray-700 text-sm leading-relaxed">{action.action}</p>
                 </div>
               )
             })}
