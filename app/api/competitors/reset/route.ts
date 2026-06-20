@@ -45,6 +45,9 @@ export async function DELETE() {
     await supabase.from('competitor_diffs').delete().in('competitor_id', ids)
     await supabase.from('competitors').delete().in('id', ids)
 
+    // Clear org-level generated content so it regenerates for new competitors
+    await supabase.from('weekly_briefs').delete().eq('org_id', membership.org_id)
+
     return NextResponse.json({ deleted: ids.length })
   } catch (err) {
     console.error('[DELETE /api/competitors/reset]', err)

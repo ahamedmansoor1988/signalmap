@@ -85,8 +85,17 @@ export default async function BriefPage() {
     }
   }
 
-  const latest = briefs?.[0] ?? null
-  const previous = briefs?.slice(1) ?? []
+  // Discard brief if none of the top_moves competitors match current org competitors
+  const currentNames = new Set((orgCompetitors ?? []).map(c => c.name.toLowerCase()))
+  function briefIsStale(brief: typeof briefs extends (infer T)[] | null | undefined ? T : never) {
+    const moves = Array.isArray(brief?.top_moves) ? (brief.top_moves as Array<{ competitor?: string }>) : []
+    if (moves.length === 0) return false
+    return !moves.some(m => currentNames.has((m.competitor ?? '').toLowerCase()))
+  }
+
+  const validBriefs = (briefs ?? []).filter(b => !briefIsStale(b))
+  const latest = validBriefs[0] ?? null
+  const previous = validBriefs.slice(1) ?? []
 
   const topMoves: TopMove[] = Array.isArray(latest?.top_moves)
     ? (latest.top_moves as unknown as TopMove[])
