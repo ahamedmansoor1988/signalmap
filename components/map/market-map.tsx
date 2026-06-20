@@ -40,7 +40,7 @@ const NODE_R   = 22    // logo circle radius
 const TW       = 126   // theme card width
 const TH       = 48    // theme card height
 const TRND     = 10    // theme card corner radius
-const FAN      = 1.9   // total fan arc (≈108°) — competitors spread ±54° around radial
+const FAN      = Math.PI  // 180° semicircle — 5 logos get 45° spacing, very clean
 
 function dot(count: number) {
   if (!count)   return '#d1d5db'
@@ -169,22 +169,39 @@ export default function MarketMap({ competitors, isLiveData }: Props) {
                 .map(c => {
                   const cp = cPos.get(c.id)
                   if (!cp) return null
-                  // Quadratic bezier — control point pulled 40% toward map center
-                  const mx = tp.x + (cp.x - tp.x) * 0.5
-                  const my = tp.y + (cp.y - tp.y) * 0.5
-                  // nudge control point perpendicular for a gentle curve
-                  const dx = cp.x - tp.x
-                  const dy = cp.y - tp.y
+
+                  // Find where line exits the theme card boundary
+                  const dx  = cp.x - tp.x
+                  const dy  = cp.y - tp.y
                   const len = Math.sqrt(dx * dx + dy * dy) || 1
-                  const qx = mx - (dy / len) * 28
-                  const qy = my + (dx / len) * 28
+                  const hw  = TW / 2 + 4   // card half-width + padding
+                  const hh  = TH / 2 + 4   // card half-height + padding
+                  let sx: number, sy: number
+                  if (Math.abs(dy) * hw < Math.abs(dx) * hh) {
+                    // exits left or right edge
+                    sx = tp.x + Math.sign(dx) * hw
+                    sy = tp.y + (dy / dx) * Math.sign(dx) * hw
+                  } else {
+                    // exits top or bottom edge
+                    sx = tp.x + (dx / dy) * Math.sign(dy) * hh
+                    sy = tp.y + Math.sign(dy) * hh
+                  }
+
+                  // End point pulled back from competitor circle edge
+                  const ex = cp.x - (dx / len) * (NODE_R + 2)
+                  const ey = cp.y - (dy / len) * (NODE_R + 2)
+
+                  // Gentle quadratic bezier curve
+                  const mx = (sx + ex) / 2 - (dy / len) * 24
+                  const my = (sy + ey) / 2 + (dx / len) * 24
+
                   return (
                     <path key={c.id}
-                      d={`M ${tp.x} ${tp.y} Q ${qx} ${qy} ${cp.x} ${cp.y}`}
+                      d={`M ${sx} ${sy} Q ${mx} ${my} ${ex} ${ey}`}
                       fill="none"
                       stroke={cfg.color}
-                      strokeWidth={1.4}
-                      strokeOpacity={vis(c) ? 0.3 : 0.04}
+                      strokeWidth={1.3}
+                      strokeOpacity={vis(c) ? 0.35 : 0.04}
                     />
                   )
                 })
