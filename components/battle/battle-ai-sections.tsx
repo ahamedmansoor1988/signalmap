@@ -126,19 +126,29 @@ export default function BattleAISections({
             <h2 className="text-gray-700 text-sm font-semibold">Recommended Actions</h2>
           </div>
           <div className="p-4 sm:p-5 space-y-3">
-            {analysis!.battle_actions.map((action, i) => {
-              const style = getTypeStyle(action.type)
-              return (
-                <div key={i} className="bg-gray-50 rounded-xl p-4 border border-gray-100">
-                  {style && (
-                    <span className={`text-[10px] font-semibold px-2 py-0.5 rounded border inline-block mb-2 ${style.cls}`}>
-                      {style.label}
-                    </span>
-                  )}
-                  <p className="text-gray-700 text-sm leading-relaxed">{action.action}</p>
-                </div>
-              )
-            })}
+            {(() => {
+              // Deduplicate: one action per type, max 6 total
+              const seen = new Set<string>()
+              const deduped = analysis!.battle_actions.filter(a => {
+                const key = (a.type ?? 'other').toLowerCase()
+                if (seen.has(key)) return false
+                seen.add(key)
+                return true
+              }).slice(0, 6)
+              return deduped.map((action, i) => {
+                const style = getTypeStyle(action.type)
+                return (
+                  <div key={i} className="bg-gray-50 rounded-xl p-4 border border-gray-100">
+                    {style && (
+                      <span className={`text-[10px] font-semibold px-2 py-0.5 rounded border inline-block mb-2 ${style.cls}`}>
+                        {style.label}
+                      </span>
+                    )}
+                    <p className="text-gray-700 text-sm leading-relaxed">{action.action}</p>
+                  </div>
+                )
+              })
+            })()}
           </div>
         </div>
       ) : (

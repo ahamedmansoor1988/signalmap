@@ -19,35 +19,57 @@ interface HomepageData {
   summary?: string
 }
 
+function arcPath(cx: number, cy: number, r: number, startDeg: number, endDeg: number) {
+  // Converts degrees (0=right, 90=down in SVG) to arc path
+  // We use math convention (0=right, 90=UP) by negating Y
+  const toRad = (d: number) => (d * Math.PI) / 180
+  const x1 = cx + r * Math.cos(toRad(startDeg))
+  const y1 = cy - r * Math.sin(toRad(startDeg))
+  const x2 = cx + r * Math.cos(toRad(endDeg))
+  const y2 = cy - r * Math.sin(toRad(endDeg))
+  const large = endDeg - startDeg > 180 ? 1 : 0
+  return `M ${x1.toFixed(2)} ${y1.toFixed(2)} A ${r} ${r} 0 ${large} 0 ${x2.toFixed(2)} ${y2.toFixed(2)}`
+}
+
 function ThreatGauge({ score }: { score: number }) {
-  const cx = 100, cy = 100, R = 72
-  const clamped = Math.min(Math.max(score, 0), 99.9)
-  const angle = Math.PI * (1 - clamped / 100)
-  const ex = cx + R * Math.cos(angle)
-  const ey = cy - R * Math.sin(angle)
-  const nx = cx + 54 * Math.cos(angle)
-  const ny = cy - 54 * Math.sin(angle)
-  const color = score >= 75 ? '#EF4444' : score >= 50 ? '#F97316' : '#10b981'
+  const cx = 100, cy = 96, R = 64, SW = 12
+  // Gauge spans 180° to 0° (left to right through top)
+  // score=0 → 180°, score=100 → 0°
+  const needleDeg = 180 - score * 1.8  // 180° range mapped to 0-100
+  const toRad = (d: number) => (d * Math.PI) / 180
+  const nx = cx + 52 * Math.cos(toRad(needleDeg))
+  const ny = cy - 52 * Math.sin(toRad(needleDeg))
+  const color = score >= 75 ? '#EF4444' : score >= 45 ? '#F97316' : '#10b981'
+  const label = score >= 75 ? 'High' : score >= 45 ? 'Medium' : 'Low'
 
   return (
-    <svg viewBox="0 0 200 116" className="w-44 shrink-0">
-      <path
-        d={`M ${cx - R} ${cy} A ${R} ${R} 0 0 0 ${cx + R} ${cy}`}
-        fill="none" stroke="#e5e7eb" strokeWidth={14} strokeLinecap="round"
+    <svg viewBox="0 0 200 130" className="w-44 shrink-0">
+      {/* Zone: Low (green) 180°→126° = 0–30 */}
+      <path d={arcPath(cx, cy, R, 126, 180)} fill="none" stroke="#bbf7d0" strokeWidth={SW} strokeLinecap="butt" />
+      {/* Zone: Medium (orange) 126°→54° = 30–70 */}
+      <path d={arcPath(cx, cy, R, 54, 126)} fill="none" stroke="#fed7aa" strokeWidth={SW} strokeLinecap="butt" />
+      {/* Zone: High (red) 54°→0° = 70–100 */}
+      <path d={arcPath(cx, cy, R, 0, 54)} fill="none" stroke="#fecaca" strokeWidth={SW} strokeLinecap="butt" />
+
+      {/* Score indicator dot on arc */}
+      <circle
+        cx={(cx + R * Math.cos(toRad(needleDeg))).toFixed(2)}
+        cy={(cy - R * Math.sin(toRad(needleDeg))).toFixed(2)}
+        r={7} fill={color}
       />
-      {score > 0 && (
-        <path
-          d={`M ${cx - R} ${cy} A ${R} ${R} 0 0 0 ${ex.toFixed(2)} ${ey.toFixed(2)}`}
-          fill="none" stroke={color} strokeWidth={14} strokeLinecap="round"
-        />
-      )}
-      <text x={cx - R + 2} y={cy + 16} textAnchor="middle" fontSize={9} fill="#9ca3af">Low</text>
-      <text x={cx}         y={cy - R - 6} textAnchor="middle" fontSize={9} fill="#9ca3af">Mid</text>
-      <text x={cx + R - 2} y={cy + 16} textAnchor="middle" fontSize={9} fill="#9ca3af">High</text>
+
+      {/* Needle */}
       <line x1={cx} y1={cy} x2={nx.toFixed(2)} y2={ny.toFixed(2)}
-        stroke="#374151" strokeWidth={2.5} strokeLinecap="round" />
-      <circle cx={cx} cy={cy} r={5} fill="#374151" />
-      <text x={cx} y={cy + 20} textAnchor="middle" fontSize={24} fontWeight={700} fill="#111827">{score}</text>
+        stroke="#374151" strokeWidth={2} strokeLinecap="round" />
+      <circle cx={cx} cy={cy} r={4} fill="#374151" />
+
+      {/* Labels */}
+      <text x={cx - R - 4} y={cy + 14} textAnchor="middle" fontSize={8} fill="#9ca3af">Low</text>
+      <text x={cx + R + 4} y={cy + 14} textAnchor="middle" fontSize={8} fill="#9ca3af">High</text>
+
+      {/* Score + level */}
+      <text x={cx} y={cy + 24} textAnchor="middle" fontSize={22} fontWeight={700} fill="#111827">{score}</text>
+      <text x={cx} y={cy + 38} textAnchor="middle" fontSize={9} fontWeight={600} fill={color}>{label}</text>
     </svg>
   )
 }
