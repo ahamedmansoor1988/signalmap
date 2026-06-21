@@ -30,18 +30,15 @@ function pickTheme(
 }
 
 function computeRisk(
-  dbScore: number,
+  dbScore: number | null,
   allChanges: Array<{ detected_at: string; risk_score: number | null }>,
-  diffCount: number
 ): number {
-  // Prefer DB score if it's been set by cron
-  if (dbScore > 0) return dbScore
+  // Use DB score if set (including 0); only derive when null
+  if (dbScore != null) return dbScore
 
-  // Derive from signal volume: each change +6, recent (7d) change +12, capped at 95
   const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
   const recentCount = allChanges.filter(c => new Date(c.detected_at) >= sevenDaysAgo).length
-  const score = Math.min(95, allChanges.length * 6 + recentCount * 12 + diffCount * 8)
-  return score > 0 ? score : 0
+  return Math.min(100, allChanges.length * 6 + recentCount * 12)
 }
 
 export default async function MapPage() {
@@ -73,18 +70,6 @@ export default async function MapPage() {
 
       if (!dbCompetitors || dbCompetitors.length === 0) redirect('/onboarding')
 
-      // Fetch real diff counts for all competitor IDs
-      const ids = dbCompetitors.map(c => c.id)
-      const { data: diffs } = await supabase
-        .from('competitor_diffs')
-        .select('competitor_id')
-        .in('competitor_id', ids)
-
-      const diffCountMap = new Map<string, number>()
-      for (const d of diffs ?? []) {
-        diffCountMap.set(d.competitor_id, (diffCountMap.get(d.competitor_id) ?? 0) + 1)
-      }
-
       competitors = dbCompetitors.map((c, idx) => {
         type RawChange = { theme: string | null; ai_signal: string | null; detected_at: string; risk_score: number | null }
         const allChanges = (c.changes as Array<{ changes: RawChange[] }>)
@@ -95,7 +80,7 @@ export default async function MapPage() {
         const activityCount = allChanges.filter(ch => new Date(ch.detected_at) >= sevenDaysAgo).length
 
         const theme    = pickTheme(allChanges, idx)
-        const riskScore = computeRisk(c.risk_score, allChanges, diffCountMap.get(c.id) ?? 0)
+        const riskScore = computeRisk(c.risk_score, allChanges)
 
         return {
           id: c.id,

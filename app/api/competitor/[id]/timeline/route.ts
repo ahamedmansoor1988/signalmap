@@ -47,6 +47,15 @@ export async function GET(
     .maybeSingle()
 
   const plan = (membership?.organizations as { plan?: string } | null)?.plan ?? 'starter'
+
+  // Verify competitor belongs to this org
+  const { data: ownerCheck } = await supabase
+    .from('competitors')
+    .select('id')
+    .eq('id', params.id)
+    .eq('org_id', membership?.org_id ?? '')
+    .maybeSingle()
+  if (!ownerCheck) return NextResponse.json({ error: 'Not found' }, { status: 404 })
   const paid = isPaid(plan)
 
   const requested = parseInt(req.nextUrl.searchParams.get('days') ?? '7', 10)

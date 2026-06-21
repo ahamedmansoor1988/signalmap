@@ -32,10 +32,26 @@ export default function AddCompetitorForm({ orgId, onSuccess }: Props) {
     setUrls((prev) => prev.map((u, idx) => (idx === i ? val : u)))
   }
 
+  function isSafeUrl(raw: string): boolean {
+    try {
+      const url = new URL(raw.startsWith('http') ? raw : `https://${raw}`)
+      if (url.protocol !== 'https:' && url.protocol !== 'http:') return false
+      const hostname = url.hostname
+      if (/^(localhost|127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(hostname)) return false
+      return true
+    } catch { return false }
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setLoading(true)
     setError(null)
+
+    if (!isSafeUrl(website)) {
+      setError('Invalid website URL — must be a public domain')
+      setLoading(false)
+      return
+    }
 
     try {
       const { data: comp, error: compErr } = await supabase

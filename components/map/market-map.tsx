@@ -114,10 +114,24 @@ function AddCompetitorModal({ onClose, onAdded }: { onClose: () => void; onAdded
   const [error, setError] = useState<string | null>(null)
   const supabase = createClient()
 
+  function isSafeUrl(raw: string): boolean {
+    try {
+      const url = new URL(raw.startsWith('http') ? raw : `https://${raw}`)
+      if (url.protocol !== 'https:' && url.protocol !== 'http:') return false
+      const hostname = url.hostname
+      if (/^(localhost|127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(hostname)) return false
+      return true
+    } catch { return false }
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!name.trim() || !website.trim()) return
     const normalizedSite = website.trim().startsWith('http') ? website.trim() : `https://${website.trim()}`
+    if (!isSafeUrl(normalizedSite)) {
+      setError('Invalid website URL — must be a public domain')
+      return
+    }
     setError(null)
     setStep('syncing')
     setSyncMsg('Adding competitor…')
