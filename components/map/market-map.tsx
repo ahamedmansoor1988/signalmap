@@ -5,7 +5,7 @@ import { THEME_CONFIG, type Theme } from './mock-data'
 import CompetitorDrawer from './competitor-drawer'
 import {
   Search, Plus, RefreshCw, X, LayoutGrid, List, Network, Check, Loader2,
-  Building2, Zap, Clock, TrendingUp, TrendingDown, Minus, Globe
+  Building2, Zap, Clock, TrendingUp, TrendingDown, Globe
 } from 'lucide-react'
 import type { TimeMachineCompetitor } from '@/app/api/time-machine/route'
 import { getLogoUrl } from '@/lib/get-logo-url'
