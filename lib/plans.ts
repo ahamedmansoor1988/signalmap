@@ -24,3 +24,14 @@ export function competitorLabel(limit: number, used: number): string {
   if (limit === -1 || limit >= 9999) return `${used} competitors (unlimited)`
   return `${used} / ${limit} competitors`
 }
+
+export function isPaid(plan: string): boolean {
+  return plan === 'pro' || plan === 'business' || plan === 'elite'
+}
+
+export const TIME_PERIODS = [
+  { days: 7,  label: '7d',  paid: false },
+  { days: 30, label: '30d', paid: true  },
+  { days: 60, label: '60d', paid: true  },
+  { days: 90, label: '90d', paid: true  },
+] as const

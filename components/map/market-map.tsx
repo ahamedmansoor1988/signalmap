@@ -9,6 +9,7 @@ import {
 } from 'lucide-react'
 import type { TimeMachineCompetitor } from '@/app/api/time-machine/route'
 import TimeMachineBrief from './time-machine-brief'
+import { isPaid } from '@/lib/plans'
 import { getLogoUrl } from '@/lib/get-logo-url'
 import type { TypedAction } from '@/lib/typed-actions'
 import { createClient } from '@/lib/supabase/client'
@@ -31,6 +32,7 @@ export interface MapCompetitor {
 
 interface Props {
   competitors: MapCompetitor[]
+  plan?: string
 }
 
 type ViewMode = 'cluster' | 'cards' | 'list'
@@ -238,7 +240,8 @@ function AddCompetitorModal({ onClose, onAdded }: { onClose: () => void; onAdded
 }
 
 // ── Main Component ──────────────────────────────────────────────
-export default function MarketMap({ competitors }: Props) {
+export default function MarketMap({ competitors, plan = 'starter' }: Props) {
+  const paid = isPaid(plan)
   const [selected,    setSelected]    = useState<MapCompetitor | null>(null)
   const [hovered,     setHovered]     = useState<string | null>(null)
   const [search,      setSearch]      = useState('')
@@ -456,22 +459,36 @@ export default function MarketMap({ competitors }: Props) {
         <div className="flex-1" />
 
         {/* ── Time Machine ── */}
-        <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-0.5">
+        <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-0.5 relative group/tm">
           <Clock className={`w-3.5 h-3.5 ml-1.5 shrink-0 ${timeDays > 0 ? 'text-violet-500' : 'text-gray-400'}`} />
-          {([0, 30, 60, 90] as const).map(d => (
-            <button
-              key={d}
-              onClick={() => setTimeDays(d)}
-              className={`text-[11px] font-semibold px-2.5 py-1 rounded-md transition-all ${
-                timeDays === d
-                  ? 'bg-white shadow-sm text-violet-600'
-                  : 'text-gray-400 hover:text-gray-600'
-              }`}
-            >
-              {d === 0 ? 'Now' : `${d}d`}
-            </button>
-          ))}
+          {([0, 30, 60, 90] as const).map(d => {
+            const locked = d > 0 && !paid
+            return (
+              <button
+                key={d}
+                onClick={() => { if (!locked) setTimeDays(d) }}
+                title={locked ? 'Upgrade to Pro to unlock historical views' : undefined}
+                className={`relative flex items-center gap-0.5 text-[11px] font-semibold px-2.5 py-1 rounded-md transition-all ${
+                  locked
+                    ? 'text-gray-300 cursor-not-allowed'
+                    : timeDays === d
+                    ? 'bg-white shadow-sm text-violet-600'
+                    : 'text-gray-400 hover:text-gray-600'
+                }`}
+              >
+                {locked && <svg className="w-2.5 h-2.5 shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 1a4.5 4.5 0 00-4.5 4.5V9H5a2 2 0 00-2 2v6a2 2 0 002 2h10a2 2 0 002-2v-6a2 2 0 00-2-2h-.5V5.5A4.5 4.5 0 0010 1zm3 8V5.5a3 3 0 10-6 0V9h6z" clipRule="evenodd" /></svg>}
+                {d === 0 ? 'Now' : `${d}d`}
+              </button>
+            )
+          })}
           {timeLoading && <Loader2 className="w-3 h-3 text-violet-400 animate-spin mr-1" />}
+          {/* Upgrade tooltip for free users */}
+          {!paid && (
+            <div className="absolute top-full mt-2 right-0 bg-gray-900 text-white text-[11px] rounded-lg px-3 py-2 w-48 shadow-xl opacity-0 group-hover/tm:opacity-100 pointer-events-none transition-opacity z-50">
+              <p className="font-semibold mb-0.5">Upgrade to unlock</p>
+              <p className="text-gray-400">30, 60 &amp; 90-day views available on Pro+ plans</p>
+            </div>
+          )}
         </div>
 
         {/* Add Competitor */}

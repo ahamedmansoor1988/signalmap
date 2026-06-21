@@ -5,6 +5,7 @@ import { ArrowLeft, ExternalLink, TrendingUp, Zap, AlertTriangle } from 'lucide-
 import { THEME_CONFIG } from '@/components/map/mock-data'
 import type { Theme } from '@/components/map/mock-data'
 import RiskSparkline from '@/components/competitor/risk-sparkline'
+import SignalTimeline from '@/components/competitor/signal-timeline'
 
 function getLogoUrl(website: string) {
   try {
@@ -32,6 +33,13 @@ export default async function CompetitorProfilePage({ params }: { params: { id: 
   type DiffRow = { id: string; change_type: string; detected_at: string; summary: string | null }
   type RiskRow = { scored_at: string; product_velocity: number; messaging_overlap: number; market_reach: number; total: number }
   type ChangeRow = { id: string; ai_signal: string | null; theme: string | null; detected_at: string; confidence: number | null }
+
+  const { data: membership } = await supabase
+    .from('org_members')
+    .select('organizations(plan)')
+    .eq('user_id', (await supabase.auth.getUser()).data.user?.id ?? '')
+    .maybeSingle()
+  const plan = (membership?.organizations as { plan?: string } | null)?.plan ?? 'starter'
 
   let competitor: CompetitorFull | null = null
   let diffs: DiffRow[] | null = null
@@ -233,6 +241,11 @@ export default async function CompetitorProfilePage({ params }: { params: { id: 
               <p className="text-xs text-gray-400 mt-0.5">total signals detected</p>
             </div>
           </div>
+        </div>
+
+        {/* ── Signal Timeline ── */}
+        <div className="mt-4">
+          <SignalTimeline competitorId={params.id} plan={plan} />
         </div>
 
         {/* ── Changes feed ── */}
