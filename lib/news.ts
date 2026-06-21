@@ -52,22 +52,29 @@ async function fetchRSS(query: string, daysBack: number): Promise<NewsItem[]> {
 
 export async function fetchCompetitorNews(
   competitorName: string,
-  daysBack = 30
+  daysBack = 30,
+  productNames: string[] = []
 ): Promise<NewsItem[]> {
-  // Run multiple queries in parallel:
-  // 1. Exact name match (e.g. "Intercom")
-  // 2. Broad name match without quotes — catches product-level news (e.g. Fin acquired)
-  // 3. High-signal terms tied to the competitor
-  const [exact, broad, acquisition] = await Promise.all([
+  // Build queries: company name, product/sub-brand names, high-signal acquisition terms
+  const allTerms = [competitorName, ...productNames.filter(p => p !== competitorName)].slice(0, 4)
+
+  const queries = [
+    // Exact company name
     fetchRSS(`"${competitorName}"`, daysBack),
-    fetchRSS(`${competitorName} announcement OR acquired OR funding OR launch OR partnership`, daysBack),
-    fetchRSS(`${competitorName} acquired OR acquires OR merger OR IPO`, daysBack),
-  ])
+    // High-signal company events
+    fetchRSS(`${competitorName} acquired OR acquires OR funding OR IPO OR merger OR launch`, daysBack),
+    // Product names (e.g. "Fin", "Fin AI") — catches acquisition news that references product not company
+    ...allTerms.slice(1).map(term => fetchRSS(`"${term}" acquired OR funding OR launch OR partnership`, daysBack)),
+  ]
+
+  const results = await Promise.all(queries)
+  const [exact, broad, ...productResults] = results
+  void broad
 
   // Merge and deduplicate by link
   const seen = new Set<string>()
   const merged: NewsItem[] = []
-  for (const item of [...exact, ...broad, ...acquisition]) {
+  for (const item of [...exact, ...results.slice(1).flat(), ...productResults.flat()]) {
     const key = item.link || item.title
     if (!seen.has(key)) { seen.add(key); merged.push(item) }
   }

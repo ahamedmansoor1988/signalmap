@@ -290,6 +290,8 @@ export interface Database {
           risk_score: number
           ai_summary: string | null
           suggested_actions: Json | null
+          product_names: string[] | null
+          brand_metadata: Json | null
           created_at: string
         }
         Insert: {
@@ -301,6 +303,8 @@ export interface Database {
           risk_score?: number
           ai_summary?: string | null
           suggested_actions?: Json | null
+          product_names?: string[] | null
+          brand_metadata?: Json | null
           created_at?: string
         }
         Update: {
@@ -312,6 +316,8 @@ export interface Database {
           risk_score?: number
           ai_summary?: string | null
           suggested_actions?: Json | null
+          product_names?: string[] | null
+          brand_metadata?: Json | null
           created_at?: string
         }
         Relationships: [
@@ -331,6 +337,8 @@ export interface Database {
           url: string
           label: string | null
           last_crawled_at: string | null
+          page_type: string | null
+          auto_discovered: boolean
           created_at: string
         }
         Insert: {
@@ -339,6 +347,8 @@ export interface Database {
           url: string
           label?: string | null
           last_crawled_at?: string | null
+          page_type?: string | null
+          auto_discovered?: boolean
           created_at?: string
         }
         Update: {
@@ -347,6 +357,8 @@ export interface Database {
           url?: string
           label?: string | null
           last_crawled_at?: string | null
+          page_type?: string | null
+          auto_discovered?: boolean
           created_at?: string
         }
         Relationships: [
