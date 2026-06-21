@@ -68,8 +68,12 @@ export default function BackfillButton({ competitorId, plan }: Props) {
       }
 
       setInserted(totalInserted)
-      setState('done')
-      if (totalInserted > 0) setTimeout(() => window.location.reload(), 1000)
+      if (totalInserted === 0) {
+        setState('idle')
+      } else {
+        setState('done')
+        setTimeout(() => window.location.reload(), 1000)
+      }
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : 'Unexpected error — try again')
       setState('error')
@@ -109,11 +113,6 @@ export default function BackfillButton({ competitorId, plan }: Props) {
         </p>
       )}
 
-      {state === 'done' && inserted === 0 && (
-        <p className="text-[10px] text-gray-400 leading-snug mt-1.5 text-center">
-          No historical changes found — Wayback Machine may not have snapshots for this site.
-        </p>
-      )}
 
       {state === 'error' && (
         <p className="text-[10px] text-red-500 leading-snug mt-1.5 text-center">
