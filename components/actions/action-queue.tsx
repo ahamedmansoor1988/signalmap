@@ -12,8 +12,8 @@ const TYPE_STYLE: Record<string, string> = {
   product: 'bg-violet-50 text-violet-700', general: 'bg-gray-100 text-gray-600',
 }
 
-export default function ActionQueue({ initialTasks, people, userId, defaultRole }: {
-  initialTasks: Task[]; people: Person[]; userId: string; defaultRole: string
+export default function ActionQueue({ initialTasks, people, userId }: {
+  initialTasks: Task[]; people: Person[]; userId: string; defaultRole?: string
 }) {
   const [tasks, setTasks] = useState(initialTasks)
   const [scope, setScope] = useState<'mine' | 'team'>('mine')
