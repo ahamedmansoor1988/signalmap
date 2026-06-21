@@ -162,7 +162,7 @@ export default function DashboardNav({ user }: { user: SupabaseUser }) {
           </button>
 
           {menuOpen && (
-            <div className="absolute bottom-9 left-1/2 -translate-x-1/2 w-52 bg-white border border-gray-200 rounded-xl shadow-xl z-50 overflow-hidden">
+            <div className="absolute bottom-0 left-full ml-3 w-52 bg-white border border-gray-200 rounded-xl shadow-xl z-50 overflow-hidden">
               {/* User info */}
               <div className="px-3 py-2.5 border-b border-gray-100">
                 <p className="text-xs font-semibold text-gray-900 truncate">{displayName}</p>
