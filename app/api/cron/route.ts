@@ -9,7 +9,20 @@ import { getCrawlTier, shouldCrawlNow } from '@/lib/crawl-schedule'
 import { sendDigest } from '@/lib/digest'
 import { generateWeeklyBrief } from '@/lib/weekly-brief'
 import { generateTypedActions } from '@/lib/personalized-actions'
+import { fetchCompetitorNews } from '@/lib/news'
+import { discoverStrategicPages } from '@/lib/sitemap'
+import { extractBrandProfile } from '@/lib/brand-extractor'
 import type { Database } from '@/lib/supabase/types'
+
+interface NewsSignalResult {
+  summary: string; signal: string; confidence: number
+  risk_score: number; theme: string; impact_bullets: string[]
+}
+
+const NEWS_SIGNAL_PROMPT = `You are a senior competitive intelligence analyst for a PMM.
+Analyze this news article about a competitor and extract the strategic signal.
+Focus on: acquisitions, funding, partnerships, product launches, executive moves, market expansion, pricing changes.
+Respond with JSON: { "summary": "...", "signal": "...", "confidence": 0-100, "risk_score": 0-100, "theme": "AI Features|Pricing|Enterprise|GTM|Content", "impact_bullets": ["..."] }`
 
 export const runtime = 'nodejs'
 export const maxDuration = 300
@@ -286,6 +299,90 @@ export async function GET(req: NextRequest) {
     }
   }
 
+  // ── Daily news + sitemap refresh for every competitor ──────────
+  // Runs every day regardless of page crawl results
+  const { data: allCompetitors } = await supabase
+    .from('competitors')
+    .select('id, name, website, org_id, product_names')
+
+  const newsResults: Array<{ competitor: string; articles: number; new_pages: number }> = []
+
+  for (const comp of allCompetitors ?? []) {
+    try {
+      const base = comp.website?.startsWith('http') ? comp.website.replace(/\/$/, '') : `https://${comp.website?.replace(/\/$/, '')}`
+
+      // Parallel: news fetch + sitemap discovery
+      const [newsItems, sitemapPages, homeCrawl] = await Promise.all([
+        fetchCompetitorNews(comp.name, 1, (comp.product_names as string[] | null) ?? []), // last 24h only in cron
+        discoverStrategicPages(base),
+        crawlPage(base).catch(() => ({ text: '' })),
+      ])
+
+      // Refresh brand profile from homepage (fast — only updates if homepage changed)
+      if (homeCrawl.text.length > 200) {
+        const brand = await extractBrandProfile(comp.name, homeCrawl.text)
+        await supabase.from('competitors').update({
+          product_names: brand.search_terms,
+          brand_metadata: brand as never,
+        }).eq('id', comp.id)
+      }
+
+      // Auto-register any new strategic pages from sitemap
+      const { data: existingPages } = await supabase
+        .from('tracked_pages').select('url').eq('competitor_id', comp.id)
+      const existingUrls = new Set(existingPages?.map(p => p.url) ?? [])
+      let newPages = 0
+
+      for (const page of sitemapPages) {
+        if (!existingUrls.has(page.url)) {
+          const { data: newPage } = await supabase
+            .from('tracked_pages')
+            .insert({ competitor_id: comp.id, url: page.url, label: page.label, auto_discovered: true })
+            .select('id').single()
+          if (newPage && page.priority >= 8) {
+            await supabase.from('changes').insert({
+              tracked_page_id: newPage.id,
+              ai_summary: `${comp.name} has a new ${page.label} page at ${page.url} — auto-discovered via sitemap.`,
+              ai_signal: `${comp.name} added new ${page.label} page — possible product or segment expansion`,
+              confidence: 70, risk_score: 55, theme: 'GTM',
+              impact_bullets: ['New page may signal product/segment expansion', `Review ${page.url}`, 'Added to tracking automatically'],
+              detected_at: new Date().toISOString(),
+            })
+            newPages++
+          }
+        }
+      }
+
+      // Get home page for attaching news signals
+      const { data: homePage } = await supabase
+        .from('tracked_pages').select('id').eq('competitor_id', comp.id)
+        .order('created_at', { ascending: true }).limit(1).maybeSingle()
+
+      // Emit per-article news signals with correct pubDate
+      let articlesSignalled = 0
+      if (newsItems.length > 0 && homePage) {
+        for (const article of newsItems.slice(0, 5)) {
+          try {
+            const prompt = `Competitor: ${comp.name}\nSource: ${article.source}\nPublished: ${article.pubDate}\nTitle: ${article.title}\n${article.snippet ? `Summary: ${article.snippet}` : ''}`
+            const ai = await callClaudeJSON<NewsSignalResult>(NEWS_SIGNAL_PROMPT, prompt, 600)
+            if (ai.confidence < 30 && ai.risk_score < 20) continue
+            await supabase.from('changes').insert({
+              tracked_page_id: homePage.id,
+              ai_summary: ai.summary, ai_signal: ai.signal,
+              confidence: ai.confidence, risk_score: ai.risk_score,
+              theme: ai.theme, impact_bullets: ai.impact_bullets,
+              detected_at: article.pubDateMs > 0 ? new Date(article.pubDateMs).toISOString() : new Date().toISOString(),
+            })
+            articlesSignalled++
+          } catch { /* skip */ }
+        }
+      }
+
+      newsResults.push({ competitor: comp.name, articles: articlesSignalled, new_pages: newPages })
+      await sleep(1000) // rate limit between competitors
+    } catch { /* non-fatal per competitor */ }
+  }
+
   // Send daily digest if there were any detected changes
   let digest: { sent: boolean; count?: number; reason?: string } = { sent: false, reason: 'skipped' }
   const hasChanges = results.some((r) => r.status === 'change_detected')
@@ -311,6 +408,7 @@ export async function GET(req: NextRequest) {
     crawled: pages.length,
     skipped: allPages.length - pages.length,
     results,
+    news: newsResults,
     digest,
     brief,
   })
