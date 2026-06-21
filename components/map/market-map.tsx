@@ -8,6 +8,7 @@ import {
   Building2, Zap, Clock, TrendingUp, TrendingDown, Globe
 } from 'lucide-react'
 import type { TimeMachineCompetitor } from '@/app/api/time-machine/route'
+import TimeMachineBrief from './time-machine-brief'
 import { getLogoUrl } from '@/lib/get-logo-url'
 import type { TypedAction } from '@/lib/typed-actions'
 import { createClient } from '@/lib/supabase/client'
@@ -255,6 +256,7 @@ export default function MarketMap({ competitors }: Props) {
   const [timeDays,     setTimeDays]     = useState<0 | 30 | 60 | 90>(0)
   const [timeData,     setTimeData]     = useState<TimeMachineCompetitor[] | null>(null)
   const [timeLoading,  setTimeLoading]  = useState(false)
+  const [briefOpen,    setBriefOpen]    = useState(false)
 
   useEffect(() => {
     if (timeDays === 0) { setTimeData(null); return }
@@ -493,13 +495,27 @@ export default function MarketMap({ competitors }: Props) {
           <div className="flex items-center gap-3 text-violet-200">
             <span className="flex items-center gap-1"><TrendingUp className="w-3 h-3 text-red-300" /> Risk increased</span>
             <span className="flex items-center gap-1"><TrendingDown className="w-3 h-3 text-emerald-300" /> Risk decreased</span>
-            <button onClick={() => setTimeDays(0)} className="text-white hover:text-violet-200 font-semibold ml-2">✕ Back to now</button>
+            <button
+              onClick={() => setBriefOpen(true)}
+              className="flex items-center gap-1.5 bg-white/20 hover:bg-white/30 text-white font-semibold px-3 py-1 rounded-full transition-colors ml-1"
+            >
+              View Brief
+            </button>
+            <button onClick={() => { setTimeDays(0); setBriefOpen(false) }} className="text-white hover:text-violet-200 font-semibold">✕ Back to now</button>
           </div>
         </div>
       )}
 
       {/* ── Canvas / Cards / List ── */}
       <div className="flex-1 relative overflow-hidden">
+
+        {/* Time Machine Brief panel */}
+        {briefOpen && timeDays > 0 && (
+          <TimeMachineBrief
+            days={timeDays as 30 | 60 | 90}
+            onClose={() => setBriefOpen(false)}
+          />
+        )}
 
         {/* ── CLUSTER VIEW ── */}
         {viewMode === 'cluster' && (
