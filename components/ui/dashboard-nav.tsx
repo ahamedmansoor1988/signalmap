@@ -7,7 +7,7 @@ import { cn } from '@/lib/utils'
 import {
   Map, Users, GitCompare, BarChart3,
   Settings, Swords, TrendingUp, ListTodo,
-  Sun, Moon, LogOut, User,
+  Sun, Moon, LogOut, User, Zap,
 } from 'lucide-react'
 import type { User as SupabaseUser } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/client'
@@ -170,14 +170,21 @@ export default function DashboardNav({ user }: { user: SupabaseUser }) {
               </div>
 
               <div className="py-1">
-                <Link
-                  href="/settings"
-                  onClick={() => setMenuOpen(false)}
-                  className="flex items-center gap-2.5 px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 transition-colors"
+                <button
+                  onClick={() => { setMenuOpen(false); router.push('/settings') }}
+                  className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 transition-colors"
                 >
                   <User className="w-3.5 h-3.5 text-gray-400" />
                   Profile &amp; Settings
-                </Link>
+                </button>
+
+                <button
+                  onClick={() => { setMenuOpen(false); router.push('/settings#plan') }}
+                  className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 transition-colors"
+                >
+                  <Zap className="w-3.5 h-3.5 text-violet-400" />
+                  Change plan
+                </button>
 
                 <button
                   onClick={toggleDark}
