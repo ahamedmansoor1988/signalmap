@@ -247,43 +247,51 @@ export async function POST(_req: NextRequest, { params }: { params: { competitor
     }
   }
 
-  // ── Step 3: Process Google News articles ───────────────────
+  // ── Step 3: Process Google News articles — one signal per article ──
+  // Using pubDate as detected_at so signals show the correct age, not "just now"
   let newsSignal: string | undefined
-  if (newsItems.length > 0 && homePage) {
-    try {
-      const articleList = newsItems
-        .slice(0, 15)
-        .map((a, i) => `${i + 1}. [${a.source}] ${a.title}${a.snippet ? ` — ${a.snippet}` : ''} (${a.pubDate})`)
-        .join('\n')
+  const topArticles = newsItems.slice(0, 8)
 
-      const newsPrompt = `Competitor: ${competitor.name}
-Source: Google News RSS — last 30 days
-Articles found: ${newsItems.length}
+  if (topArticles.length > 0 && homePage) {
+    let articlesProcessed = 0
+    for (const article of topArticles) {
+      try {
+        const newsPrompt = `Competitor: ${competitor.name}
+Source: ${article.source}
+Published: ${article.pubDate}
+Title: ${article.title}
+${article.snippet ? `Summary: ${article.snippet}` : ''}`
 
-${articleList}`
+        const ai = await callClaudeJSON<NewsSignalResult>(NEWS_SIGNAL_PROMPT, newsPrompt, 600)
 
-      const ai = await callClaudeJSON<NewsSignalResult>(NEWS_SIGNAL_PROMPT, newsPrompt, 900)
+        // Skip generic/low-signal articles (AI will give low confidence or risk)
+        if (ai.confidence < 30 && ai.risk_score < 20) continue
 
-      await supabase.from('changes').insert({
-        tracked_page_id: homePage.id,
-        before_snapshot_id: null,
-        after_snapshot_id: null,
-        diff_html: null,
-        ai_summary: ai.summary,
-        ai_signal: ai.signal,
-        confidence: ai.confidence,
-        risk_score: ai.risk_score,
-        theme: ai.theme,
-        impact_bullets: ai.impact_bullets,
-        detected_at: now,
-      })
+        // Use the actual article publish date so inbox shows correct age
+        const articleDate = article.pubDateMs > 0
+          ? new Date(article.pubDateMs).toISOString()
+          : now
 
-      if (ai.risk_score > highestRisk) highestRisk = ai.risk_score
-      newsSignal = ai.signal
-      results.push({ label: 'News', status: `${newsItems.length} articles`, signal: ai.signal })
-    } catch (err) {
-      results.push({ label: 'News', status: `error: ${String(err).slice(0, 60)}` })
+        await supabase.from('changes').insert({
+          tracked_page_id: homePage.id,
+          before_snapshot_id: null,
+          after_snapshot_id: null,
+          diff_html: null,
+          ai_summary: ai.summary,
+          ai_signal: ai.signal,
+          confidence: ai.confidence,
+          risk_score: ai.risk_score,
+          theme: ai.theme,
+          impact_bullets: ai.impact_bullets,
+          detected_at: articleDate,
+        })
+
+        if (ai.risk_score > highestRisk) highestRisk = ai.risk_score
+        if (!newsSignal) newsSignal = ai.signal
+        articlesProcessed++
+      } catch { /* skip bad article */ }
     }
+    results.push({ label: 'News', status: `${articlesProcessed}/${topArticles.length} articles signalled`, signal: newsSignal })
   } else {
     results.push({ label: 'News', status: newsItems.length === 0 ? 'no_articles_found' : 'no_page_to_attach' })
   }
