@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, ExternalLink, TrendingUp, Zap, AlertTriangle } from 'lucide-react'
+import BackfillButton from '@/components/competitor/backfill-button'
 import { THEME_CONFIG } from '@/components/map/mock-data'
 import type { Theme } from '@/components/map/mock-data'
 import RiskSparkline from '@/components/competitor/risk-sparkline'
@@ -241,6 +242,7 @@ export default async function CompetitorProfilePage({ params }: { params: { id: 
               className="flex items-center justify-center gap-1.5 w-full text-xs font-semibold px-3 py-2.5 rounded-lg border border-gray-200 text-gray-700 hover:border-violet-300 hover:bg-violet-50 hover:text-violet-700 transition-colors">
               View All Signals →
             </Link>
+            <BackfillButton competitorId={params.id} plan={plan} />
             <div className="mt-auto pt-3 border-t border-gray-100 text-center">
               <p className="text-2xl font-bold text-gray-900">{allChanges.length}</p>
               <p className="text-xs text-gray-400 mt-0.5">total signals detected</p>
