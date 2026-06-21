@@ -13,6 +13,9 @@ interface Props {
 type State = 'idle' | 'loading' | 'done' | 'error'
 
 interface BackfillResult {
+  total_pages: number
+  page_index: number
+  done: boolean
   changes_inserted: number
 }
 
@@ -20,6 +23,7 @@ export default function BackfillButton({ competitorId, plan }: Props) {
   const [state, setState] = useState<State>('idle')
   const [inserted, setInserted] = useState(0)
   const [errorMsg, setErrorMsg] = useState('')
+  const [progress, setProgress] = useState<{ current: number; total: number } | null>(null)
 
   // Locked for starter plan
   if (!isPaid(plan)) {
@@ -38,24 +42,34 @@ export default function BackfillButton({ competitorId, plan }: Props) {
     if (state === 'loading') return
     setState('loading')
     setErrorMsg('')
+    setProgress(null)
+
+    let totalInserted = 0
+    let pageIndex = 0
 
     try {
-      const res = await fetch(`/api/competitor/${competitorId}/backfill`, {
-        method: 'POST',
-      })
+      while (true) {
+        const res = await fetch(
+          `/api/competitor/${competitorId}/backfill?page_index=${pageIndex}`,
+          { method: 'POST' }
+        )
 
-      if (!res.ok) {
-        const body = await res.text()
-        throw new Error(`Server error ${res.status}: ${body.slice(0, 120)}`)
+        if (!res.ok) {
+          const body = await res.text()
+          throw new Error(`Server error ${res.status}: ${body.slice(0, 120)}`)
+        }
+
+        const data = (await res.json()) as BackfillResult
+        totalInserted += data.changes_inserted
+        setProgress({ current: data.page_index + 1, total: data.total_pages || 1 })
+
+        if (data.done || data.total_pages === 0) break
+        pageIndex++
       }
 
-      const data = (await res.json()) as BackfillResult
-      setInserted(data.changes_inserted)
+      setInserted(totalInserted)
       setState('done')
-
-      if (data.changes_inserted > 0) {
-        setTimeout(() => window.location.reload(), 1000)
-      }
+      if (totalInserted > 0) setTimeout(() => window.location.reload(), 1000)
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : 'Unexpected error — try again')
       setState('error')
@@ -74,13 +88,18 @@ export default function BackfillButton({ competitorId, plan }: Props) {
         ) : (
           <History className="w-3.5 h-3.5" />
         )}
-        {state === 'loading' ? 'Backfilling…' : 'Backfill 90d History'}
+        {state === 'loading'
+          ? progress && progress.total > 0
+            ? `Backfilling page ${progress.current}/${progress.total}…`
+            : 'Backfilling…'
+          : 'Backfill 90d History'}
       </button>
 
       {state === 'loading' && (
         <p className="text-[10px] text-gray-400 leading-snug mt-1.5 text-center">
-          Fetching Wayback Machine snapshots for 90, 60, 30 days ago…
-          <br />This may take up to 60 seconds.
+          {progress && progress.total > 0
+            ? `Fetching Wayback Machine snapshots… page ${progress.current} of ${progress.total}`
+            : 'Fetching tracked pages…'}
         </p>
       )}
 

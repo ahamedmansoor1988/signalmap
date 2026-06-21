@@ -4,7 +4,7 @@ import { crawlPage } from '@/lib/crawler'
 import { extractStructured, diffStructured } from '@/lib/structured-extractor'
 
 export const runtime = 'nodejs'
-export const maxDuration = 60
+export const maxDuration = 55
 
 // ── CDX snapshot lookup ───────────────────────────────────────────────────────
 // Returns the closest archived URL for a given URL on a specific calendar day.
@@ -64,7 +64,7 @@ async function changeExistsForDate(
 
 // ── Route handler ─────────────────────────────────────────────────────────────
 export async function POST(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: { id: string } }
 ) {
   // Auth
@@ -105,132 +105,93 @@ export async function POST(
   if (!pages?.length) {
     return NextResponse.json({
       competitor: competitor.name,
-      message: 'No tracked pages found — run a sync first to discover pages',
+      total_pages: 0,
+      page_index: 0,
+      done: true,
       changes_inserted: 0,
+      results: [],
     })
   }
 
-  // Time points to backfill: pairs of (snapshotDaysAgo, detectedAtIsoDate)
-  // We compare: (90d snapshot → 60d snapshot), (60d → 30d), (30d → now)
-  const NOW_TEXT = 'now'
-  type Checkpoint = { daysAgo: number | typeof NOW_TEXT; label: string }
-  const CHECKPOINTS: Checkpoint[] = [
-    { daysAgo: 90, label: '90d' },
-    { daysAgo: 60, label: '60d' },
-    { daysAgo: 30, label: '30d' },
-    { daysAgo: NOW_TEXT, label: 'now' },
-  ]
+  // Process ONE page per call to stay within Vercel's 60s timeout.
+  // Client calls this sequentially with page_index=0,1,2,...
+  const pageIndex = parseInt(req.nextUrl.searchParams.get('page_index') ?? '0', 10)
+  const totalPages = Math.min(pages.length, 5)
+  const page = pages[pageIndex]
 
-  const results: Array<{
-    page: string
-    pair: string
-    status: string
-    signal?: string
-  }> = []
+  if (!page || pageIndex >= totalPages) {
+    return NextResponse.json({
+      competitor: competitor.name,
+      total_pages: totalPages,
+      page_index: pageIndex,
+      done: true,
+      changes_inserted: 0,
+      results: [],
+    })
+  }
+
+  const pageLabel = page.label ?? 'home'
+  const results: Array<{ page: string; pair: string; status: string; signal?: string }> = []
   let totalInserted = 0
 
-  for (const page of pages.slice(0, 5)) {
-    const pageLabel = page.label ?? 'home'
+  // Only compare 30d→now: most useful, fastest (1 CDX + 2 crawls + 2 AI calls)
+  const cdx = await fetchCDXSnapshot(page.url, 30).catch(() => null)
 
-    // Fetch all snapshots for this page (CDX + live crawl) sequentially
-    type Snap = { text: string; isoDate: string } | null
-    const snapshots: Snap[] = []
-
-    for (const cp of CHECKPOINTS) {
+  if (!cdx) {
+    results.push({ page: pageLabel, pair: '30d→now', status: 'skipped_no_snapshot' })
+  } else {
+    const alreadyExists = await changeExistsForDate(supabase, page.id, cdx.isoDate)
+    if (alreadyExists) {
+      results.push({ page: pageLabel, pair: '30d→now', status: 'skipped_already_exists' })
+    } else {
       try {
-        if (cp.daysAgo === NOW_TEXT) {
-          const crawl = await crawlPage(page.url)
-          snapshots.push(
-            crawl.text.length > 100
-              ? { text: crawl.text, isoDate: new Date().toISOString() }
-              : null
-          )
-        } else {
-          const cdx = await fetchCDXSnapshot(page.url, cp.daysAgo)
-          if (!cdx) {
-            snapshots.push(null)
-            continue
-          }
-          const crawl = await crawlPage(cdx.archiveUrl)
-          snapshots.push(
-            crawl.text.length > 100
-              ? { text: crawl.text, isoDate: cdx.isoDate }
-              : null
-          )
-        }
-      } catch {
-        snapshots.push(null)
-      }
-    }
-
-    // Compare consecutive pairs: (0,1), (1,2), (2,3)
-    for (let i = 0; i < CHECKPOINTS.length - 1; i++) {
-      const before = snapshots[i]
-      const after  = snapshots[i + 1]
-      const pairLabel = `${CHECKPOINTS[i].label}→${CHECKPOINTS[i + 1].label}`
-
-      if (!before || !after) {
-        results.push({ page: pageLabel, pair: pairLabel, status: 'skipped_no_snapshot' })
-        continue
-      }
-
-      // Dedup: skip if we already have a change for this page on this date
-      const alreadyExists = await changeExistsForDate(supabase, page.id, after.isoDate)
-      if (alreadyExists) {
-        results.push({ page: pageLabel, pair: pairLabel, status: 'skipped_already_exists' })
-        continue
-      }
-
-      try {
-        const [beforeStructured, afterStructured] = await Promise.all([
-          extractStructured(pageLabel, before.text.slice(0, 4000)),
-          extractStructured(pageLabel, after.text.slice(0, 4000)),
+        const [beforeCrawl, afterCrawl] = await Promise.all([
+          crawlPage(cdx.archiveUrl),
+          crawlPage(page.url),
         ])
 
-        if (!beforeStructured || !afterStructured) {
-          results.push({ page: pageLabel, pair: pairLabel, status: 'skipped_extraction_failed' })
-          continue
+        if (beforeCrawl.text.length < 100 || afterCrawl.text.length < 100) {
+          results.push({ page: pageLabel, pair: '30d→now', status: 'skipped_crawl_empty' })
+        } else {
+          const [beforeStructured, afterStructured] = await Promise.all([
+            extractStructured(pageLabel, beforeCrawl.text.slice(0, 4000)),
+            extractStructured(pageLabel, afterCrawl.text.slice(0, 4000)),
+          ])
+
+          if (!beforeStructured || !afterStructured) {
+            results.push({ page: pageLabel, pair: '30d→now', status: 'skipped_extraction_failed' })
+          } else {
+            const diff = await diffStructured(pageLabel, beforeStructured, afterStructured)
+            if (!diff || diff.confidence < 30) {
+              results.push({ page: pageLabel, pair: '30d→now', status: 'no_significant_change' })
+            } else {
+              await supabase.from('changes').insert({
+                tracked_page_id: page.id,
+                ai_summary: diff.summary,
+                ai_signal: diff.signal,
+                confidence: diff.confidence,
+                risk_score: diff.risk_score,
+                theme: diff.theme,
+                impact_bullets: diff.impact_bullets,
+                diff_html: JSON.stringify(diff.structural_changes),
+                detected_at: cdx.isoDate,
+              })
+              totalInserted++
+              results.push({ page: pageLabel, pair: '30d→now', status: 'inserted', signal: diff.signal })
+            }
+          }
         }
-
-        const diff = await diffStructured(pageLabel, beforeStructured, afterStructured)
-
-        if (!diff || diff.confidence < 30) {
-          results.push({ page: pageLabel, pair: pairLabel, status: 'no_significant_change' })
-          continue
-        }
-
-        await supabase.from('changes').insert({
-          tracked_page_id: page.id,
-          ai_summary: diff.summary,
-          ai_signal: diff.signal,
-          confidence: diff.confidence,
-          risk_score: diff.risk_score,
-          theme: diff.theme,
-          impact_bullets: diff.impact_bullets,
-          diff_html: JSON.stringify(diff.structural_changes),
-          detected_at: after.isoDate,
-        })
-
-        totalInserted++
-        results.push({
-          page: pageLabel,
-          pair: pairLabel,
-          status: 'inserted',
-          signal: diff.signal,
-        })
       } catch (err) {
-        results.push({
-          page: pageLabel,
-          pair: pairLabel,
-          status: `error: ${String(err).slice(0, 80)}`,
-        })
+        results.push({ page: pageLabel, pair: '30d→now', status: `error: ${String(err).slice(0, 80)}` })
       }
     }
   }
 
   return NextResponse.json({
     competitor: competitor.name,
-    pages_processed: pages.slice(0, 5).length,
+    total_pages: totalPages,
+    page_index: pageIndex,
+    done: pageIndex >= totalPages - 1,
     changes_inserted: totalInserted,
     results,
   })
