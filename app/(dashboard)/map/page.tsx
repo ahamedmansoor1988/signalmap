@@ -115,5 +115,5 @@ export default async function MapPage() {
   }
 
   const data = competitors.length > 0 ? competitors : MOCK_COMPETITORS
-  return <MarketMap competitors={data} isLiveData={competitors.length > 0} />
+  return <MarketMap competitors={data} />
 }

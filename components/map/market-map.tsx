@@ -26,7 +26,6 @@ export interface MapCompetitor {
 
 interface Props {
   competitors: MapCompetitor[]
-  isLiveData: boolean
 }
 
 type ViewMode = 'cluster' | 'cards' | 'list'
@@ -194,7 +193,7 @@ function AddCompetitorModal({ onClose, onAdded }: { onClose: () => void; onAdded
             </div>
             <p className="text-[11px] text-gray-400 flex items-center gap-1.5">
               <RefreshCw className="w-3 h-3" />
-              We'll automatically crawl their site and pull 30 days of news signals.
+              We&apos;ll automatically crawl their site and pull 30 days of news signals.
             </p>
             {error && <p className="text-red-500 text-xs">{error}</p>}
             <button
@@ -229,7 +228,7 @@ function AddCompetitorModal({ onClose, onAdded }: { onClose: () => void; onAdded
 }
 
 // ── Main Component ──────────────────────────────────────────────
-export default function MarketMap({ competitors, isLiveData }: Props) {
+export default function MarketMap({ competitors }: Props) {
   const [selected,    setSelected]    = useState<MapCompetitor | null>(null)
   const [hovered,     setHovered]     = useState<string | null>(null)
   const [search,      setSearch]      = useState('')
