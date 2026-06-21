@@ -1,9 +1,12 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
-import { ExternalLink, Users, Zap, RefreshCw, CheckCircle2, AlertCircle } from 'lucide-react'
+import Link from 'next/link'
+import { ExternalLink, Users, Zap, RefreshCw, CheckCircle2, AlertCircle, LayoutGrid, List, Tag } from 'lucide-react'
 import { THEME_CONFIG } from '@/components/map/mock-data'
 import type { Theme } from '@/components/map/mock-data'
+
+type ViewMode = 'list' | 'cards' | 'theme'
 
 type CompetitorRow = {
   id: string
@@ -68,6 +71,7 @@ export default function CompetitorsPage() {
   const [error, setError] = useState<string | null>(null)
   const [syncStates, setSyncStates] = useState<Record<string, SyncState>>({})
   const [deepSyncingAll, setDeepSyncingAll] = useState(false)
+  const [viewMode, setViewMode] = useState<ViewMode>('list')
 
   const loadCompetitors = useCallback(() => {
     fetch('/api/competitors')
@@ -155,16 +159,38 @@ export default function CompetitorsPage() {
             <h1 className="text-gray-900 text-xl font-bold">Competitors</h1>
             <p className="text-gray-400 text-sm mt-0.5">{competitors?.length ?? 0} being tracked</p>
           </div>
-          {(competitors?.length ?? 0) > 0 && (
-            <button
-              onClick={deepSyncAll}
-              disabled={deepSyncingAll}
-              className="flex items-center gap-1.5 text-xs font-semibold text-violet-600 hover:text-violet-700 border border-violet-200 px-3 py-2 rounded-xl hover:bg-violet-50 transition-all disabled:opacity-50"
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${deepSyncingAll ? 'animate-spin' : ''}`} />
-              {deepSyncingAll ? 'Deep Syncing…' : 'Deep Sync All'}
-            </button>
-          )}
+          <div className="flex items-center gap-2">
+            {/* View switcher */}
+            <div className="flex items-center bg-gray-100 rounded-lg p-0.5">
+              {([
+                { mode: 'list'  as ViewMode, icon: List,        title: 'List'     },
+                { mode: 'cards' as ViewMode, icon: LayoutGrid,  title: 'Cards'    },
+                { mode: 'theme' as ViewMode, icon: Tag,         title: 'By Theme' },
+              ]).map(({ mode, icon: Icon, title }) => (
+                <button
+                  key={mode}
+                  title={title}
+                  onClick={() => setViewMode(mode)}
+                  className={`flex items-center gap-1 text-xs font-medium px-2.5 py-1.5 rounded-md transition-colors ${
+                    viewMode === mode ? 'bg-white shadow-sm text-violet-600' : 'text-gray-400 hover:text-gray-600'
+                  }`}
+                >
+                  <Icon className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">{title}</span>
+                </button>
+              ))}
+            </div>
+            {(competitors?.length ?? 0) > 0 && (
+              <button
+                onClick={deepSyncAll}
+                disabled={deepSyncingAll}
+                className="flex items-center gap-1.5 text-xs font-semibold text-violet-600 hover:text-violet-700 border border-violet-200 px-3 py-2 rounded-xl hover:bg-violet-50 transition-all disabled:opacity-50"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${deepSyncingAll ? 'animate-spin' : ''}`} />
+                {deepSyncingAll ? 'Deep Syncing…' : 'Deep Sync All'}
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Deep Sync explanation banner */}
@@ -206,7 +232,93 @@ export default function CompetitorsPage() {
               Add your first competitor →
             </a>
           </div>
+        ) : viewMode === 'cards' ? (
+          /* ── CARDS VIEW ── */
+          <div className="grid grid-cols-2 gap-3">
+            {competitors.map(c => {
+              const riskLevel = c.risk_score >= 75 ? 'High' : c.risk_score >= 45 ? 'Medium' : 'Low'
+              const riskColor = { High: 'text-red-600 bg-red-50', Medium: 'text-amber-600 bg-amber-50', Low: 'text-emerald-600 bg-emerald-50' }[riskLevel]
+              return (
+                <Link key={c.id} href={`/competitor/${c.id}`}
+                  className="bg-white border border-gray-200 rounded-2xl p-4 shadow-sm hover:border-violet-300 hover:shadow-md transition-all group">
+                  <div className="flex items-start justify-between mb-3">
+                    <CompetitorLogo website={c.website} name={c.name} />
+                    <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-lg ${riskColor}`}>{riskLevel}</span>
+                  </div>
+                  <p className="text-sm font-semibold text-gray-900 group-hover:text-violet-700 transition-colors">{c.name}</p>
+                  <p className="text-xs text-gray-400 truncate mt-0.5">{c.website.replace(/^https?:\/\//, '')}</p>
+                  <div className="flex items-center justify-between mt-3 pt-3 border-t border-gray-50">
+                    <span className="text-xl font-bold text-gray-900">{c.risk_score}</span>
+                    {c.signals_week > 0 && (
+                      <span className="flex items-center gap-0.5 text-[10px] font-bold text-violet-600 bg-violet-50 px-1.5 py-0.5 rounded-full">
+                        <Zap className="w-2.5 h-2.5" />{c.signals_week} this week
+                      </span>
+                    )}
+                  </div>
+                  {c.themes.length > 0 && (
+                    <div className="flex flex-wrap gap-1 mt-2">
+                      {c.themes.slice(0, 2).map(t => {
+                        const cfg = THEME_CONFIG[t as Theme]
+                        return cfg ? (
+                          <span key={t} className="text-[10px] px-1.5 py-0.5 rounded font-medium" style={{ backgroundColor: cfg.bg, color: cfg.color }}>{cfg.label}</span>
+                        ) : null
+                      })}
+                    </div>
+                  )}
+                </Link>
+              )
+            })}
+          </div>
+        ) : viewMode === 'theme' ? (
+          /* ── BY THEME VIEW ── */
+          <div className="space-y-6">
+            {(() => {
+              const themeMap = new Map<string, CompetitorRow[]>()
+              const noTheme: CompetitorRow[] = []
+              for (const c of competitors) {
+                if (!c.themes.length) { noTheme.push(c); continue }
+                const t = c.themes[0]
+                if (!themeMap.has(t)) themeMap.set(t, [])
+                themeMap.get(t)!.push(c)
+              }
+              const groups = Array.from(themeMap.entries()).sort((a, b) => b[1].length - a[1].length)
+              if (noTheme.length) groups.push(['Uncategorized', noTheme])
+              return groups.map(([theme, group]) => {
+                const cfg = THEME_CONFIG[theme as Theme]
+                return (
+                  <div key={theme}>
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="text-xs font-bold px-2.5 py-1 rounded-full" style={cfg ? { backgroundColor: cfg.bg, color: cfg.color } : { backgroundColor: '#f3f4f6', color: '#6b7280' }}>
+                        {cfg?.label ?? theme}
+                      </span>
+                      <span className="text-xs text-gray-400">{group.length} competitor{group.length > 1 ? 's' : ''}</span>
+                    </div>
+                    <div className="space-y-2">
+                      {group.map(c => {
+                        const riskLevel = c.risk_score >= 75 ? 'High' : c.risk_score >= 45 ? 'Medium' : 'Low'
+                        const riskConfig = { High: { cls: 'text-red-600 bg-red-50 border-red-100' }, Medium: { cls: 'text-amber-600 bg-amber-50 border-amber-100' }, Low: { cls: 'text-emerald-600 bg-emerald-50 border-emerald-100' } }[riskLevel]
+                        return (
+                          <div key={c.id} className="bg-white border border-gray-200 rounded-xl flex items-center gap-4 px-4 py-3 hover:border-violet-200 transition-colors">
+                            <CompetitorLogo website={c.website} name={c.name} />
+                            <div className="flex-1 min-w-0">
+                              <Link href={`/competitor/${c.id}`} className="text-sm font-semibold text-gray-900 hover:text-violet-700">{c.name}</Link>
+                              <p className="text-xs text-gray-400 truncate">{c.website.replace(/^https?:\/\//, '')}</p>
+                            </div>
+                            <div className="flex items-center gap-2 shrink-0">
+                              <span className="text-sm font-bold text-gray-900">{c.risk_score}</span>
+                              <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-lg border ${riskConfig.cls}`}>{riskLevel}</span>
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )
+              })
+            })()}
+          </div>
         ) : (
+          /* ── LIST VIEW (default) ── */
           <div className="space-y-2">
             {competitors.map((c) => {
               const riskLevel = c.risk_score >= 75 ? 'High' : c.risk_score >= 45 ? 'Medium' : 'Low'
@@ -334,3 +446,4 @@ export default function CompetitorsPage() {
     </div>
   )
 }
+

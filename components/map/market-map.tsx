@@ -1,15 +1,12 @@
 'use client'
 
-import { useState, useRef, useCallback, useEffect, useMemo } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 import { THEME_CONFIG, type Theme } from './mock-data'
 import CompetitorDrawer from './competitor-drawer'
 import {
   Search, Plus, RefreshCw, X, LayoutGrid, List, Network, Check, Loader2,
-  Building2, Zap, Clock, TrendingUp, TrendingDown, Globe
+  Building2, Zap, Globe
 } from 'lucide-react'
-import type { TimeMachineCompetitor } from '@/app/api/time-machine/route'
-import TimeMachineBrief from './time-machine-brief'
-import { isPaid } from '@/lib/plans'
 import { getLogoUrl } from '@/lib/get-logo-url'
 import type { TypedAction } from '@/lib/typed-actions'
 import { createClient } from '@/lib/supabase/client'
@@ -32,7 +29,6 @@ export interface MapCompetitor {
 
 interface Props {
   competitors: MapCompetitor[]
-  plan?: string
 }
 
 type ViewMode = 'cluster' | 'cards' | 'list'
@@ -240,8 +236,7 @@ function AddCompetitorModal({ onClose, onAdded }: { onClose: () => void; onAdded
 }
 
 // ── Main Component ──────────────────────────────────────────────
-export default function MarketMap({ competitors, plan = 'starter' }: Props) {
-  const paid = isPaid(plan)
+export default function MarketMap({ competitors }: Props) {
   const [selected,    setSelected]    = useState<MapCompetitor | null>(null)
   const [hovered,     setHovered]     = useState<string | null>(null)
   const [search,      setSearch]      = useState('')
@@ -254,37 +249,6 @@ export default function MarketMap({ competitors, plan = 'starter' }: Props) {
   const [searchOpen,    setSearchOpen]    = useState(false)
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const searchRef   = useRef<HTMLDivElement>(null)
-
-  // ── Time Machine ─────────────────────────────────────────────
-  const [timeDays,     setTimeDays]     = useState<0 | 30 | 60 | 90>(0)
-  const [timeData,     setTimeData]     = useState<TimeMachineCompetitor[] | null>(null)
-  const [timeLoading,  setTimeLoading]  = useState(false)
-  const [briefOpen,    setBriefOpen]    = useState(false)
-
-  useEffect(() => {
-    if (timeDays === 0) { setTimeData(null); return }
-    setTimeLoading(true)
-    fetch(`/api/time-machine?days=${timeDays}`)
-      .then(r => r.json() as Promise<{ competitors: TimeMachineCompetitor[] }>)
-      .then(d => setTimeData(d.competitors))
-      .catch(() => setTimeData(null))
-      .finally(() => setTimeLoading(false))
-  }, [timeDays])
-
-  // Merge: when in time-travel mode, override competitor risk/theme with historical values
-  const displayCompetitors = useMemo(() => {
-    if (!timeData) return competitors
-    const map = new Map(timeData.map(t => [t.id, t]))
-    return competitors.map(c => {
-      const h = map.get(c.id)
-      if (!h) return c
-      return { ...c, risk_score: h.risk_score, theme: (h.theme ?? c.theme) as typeof c.theme }
-    })
-  }, [competitors, timeData])
-
-  const timeDeltaFor = (id: string) => timeData?.find(t => t.id === id)
-  const cutoffLabel = timeDays === 0 ? 'Now'
-    : `${timeDays}d ago — ${new Date(Date.now() - timeDays * 86400000).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`
 
   // Load last-synced timestamp from localStorage
   useEffect(() => {
@@ -336,7 +300,7 @@ export default function MarketMap({ competitors, plan = 'starter' }: Props) {
   const dragStart = useRef({ mx: 0, my: 0, px: 0, py: 0 })
   const svgRef    = useRef<SVGSVGElement>(null)
 
-  const { tPos, cPos, themes } = layout(displayCompetitors)
+  const { tPos, cPos, themes } = layout(competitors)
   const q   = search.toLowerCase()
   const vis = (c: MapCompetitor) => !q || c.name.toLowerCase().includes(q) || c.theme.toLowerCase().includes(q)
 
@@ -381,7 +345,7 @@ export default function MarketMap({ competitors, plan = 'starter' }: Props) {
   const zoomOut  = () => setZoom(z => Math.max(+(z - 0.15).toFixed(2), 0.25))
   const resetView = () => { setZoom(1.1); setPan({ x: 0, y: 0 }) }
 
-  const filtered = displayCompetitors.filter(c => vis(c))
+  const filtered = competitors.filter(c => vis(c))
 
   return (
     <div className="flex flex-col h-full" style={{ background: '#f8f9fb' }}>
@@ -458,39 +422,6 @@ export default function MarketMap({ competitors, plan = 'starter' }: Props) {
 
         <div className="flex-1" />
 
-        {/* ── Time Machine ── */}
-        <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-0.5 relative group/tm">
-          <Clock className={`w-3.5 h-3.5 ml-1.5 shrink-0 ${timeDays > 0 ? 'text-violet-500' : 'text-gray-400'}`} />
-          {([0, 30, 60, 90] as const).map(d => {
-            const locked = d > 0 && !paid
-            return (
-              <button
-                key={d}
-                onClick={() => { if (!locked) setTimeDays(d) }}
-                title={locked ? 'Upgrade to Pro to unlock historical views' : undefined}
-                className={`relative flex items-center gap-0.5 text-[11px] font-semibold px-2.5 py-1 rounded-md transition-all ${
-                  locked
-                    ? 'text-gray-300 cursor-not-allowed'
-                    : timeDays === d
-                    ? 'bg-white shadow-sm text-violet-600'
-                    : 'text-gray-400 hover:text-gray-600'
-                }`}
-              >
-                {locked && <svg className="w-2.5 h-2.5 shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 1a4.5 4.5 0 00-4.5 4.5V9H5a2 2 0 00-2 2v6a2 2 0 002 2h10a2 2 0 002-2v-6a2 2 0 00-2-2h-.5V5.5A4.5 4.5 0 0010 1zm3 8V5.5a3 3 0 10-6 0V9h6z" clipRule="evenodd" /></svg>}
-                {d === 0 ? 'Now' : `${d}d`}
-              </button>
-            )
-          })}
-          {timeLoading && <Loader2 className="w-3 h-3 text-violet-400 animate-spin mr-1" />}
-          {/* Upgrade tooltip for free users */}
-          {!paid && (
-            <div className="absolute top-full mt-2 right-0 bg-gray-900 text-white text-[11px] rounded-lg px-3 py-2 w-48 shadow-xl opacity-0 group-hover/tm:opacity-100 pointer-events-none transition-opacity z-50">
-              <p className="font-semibold mb-0.5">Upgrade to unlock</p>
-              <p className="text-gray-400">30, 60 &amp; 90-day views available on Pro+ plans</p>
-            </div>
-          )}
-        </div>
-
         {/* Add Competitor */}
         <button
           onClick={() => setShowAddModal(true)}
@@ -500,39 +431,8 @@ export default function MarketMap({ competitors, plan = 'starter' }: Props) {
         </button>
       </div>
 
-      {/* ── Time Machine banner ── */}
-      {timeDays > 0 && (
-        <div className="flex items-center justify-between gap-3 px-4 py-2 bg-violet-600 text-white text-xs shrink-0">
-          <div className="flex items-center gap-2">
-            <Clock className="w-3.5 h-3.5 shrink-0" />
-            <span className="font-semibold">Market Time Machine</span>
-            <span className="text-violet-200">·</span>
-            <span className="text-violet-100">Viewing market as of <span className="font-semibold text-white">{cutoffLabel}</span></span>
-          </div>
-          <div className="flex items-center gap-3 text-violet-200">
-            <span className="flex items-center gap-1"><TrendingUp className="w-3 h-3 text-red-300" /> Risk increased</span>
-            <span className="flex items-center gap-1"><TrendingDown className="w-3 h-3 text-emerald-300" /> Risk decreased</span>
-            <button
-              onClick={() => setBriefOpen(true)}
-              className="flex items-center gap-1.5 bg-white/20 hover:bg-white/30 text-white font-semibold px-3 py-1 rounded-full transition-colors ml-1"
-            >
-              View Brief
-            </button>
-            <button onClick={() => { setTimeDays(0); setBriefOpen(false) }} className="text-white hover:text-violet-200 font-semibold">✕ Back to now</button>
-          </div>
-        </div>
-      )}
-
       {/* ── Canvas / Cards / List ── */}
       <div className="flex-1 relative overflow-hidden">
-
-        {/* Time Machine Brief panel */}
-        {briefOpen && timeDays > 0 && (
-          <TimeMachineBrief
-            days={timeDays as 30 | 60 | 90}
-            onClose={() => setBriefOpen(false)}
-          />
-        )}
 
         {/* ── CLUSTER VIEW ── */}
         {viewMode === 'cluster' && (
@@ -577,7 +477,7 @@ export default function MarketMap({ competitors, plan = 'starter' }: Props) {
                 {themes.map(theme => {
                   const tp  = tPos.get(theme)!
                   const cfg = THEME_CONFIG[theme]
-                  return displayCompetitors.filter(c => c.theme === theme).map(c => {
+                  return competitors.filter(c => c.theme === theme).map(c => {
                     const cp = cPos.get(c.id)
                     if (!cp) return null
                     const dx  = cp.x - tp.x
@@ -602,7 +502,7 @@ export default function MarketMap({ competitors, plan = 'starter' }: Props) {
                 {themes.map((theme, ti) => {
                   const tp  = tPos.get(theme)!
                   const cfg = THEME_CONFIG[theme]
-                  const cnt = displayCompetitors.filter(c => c.theme === theme).length
+                  const cnt = competitors.filter(c => c.theme === theme).length
                   return (
                     <g key={theme} className="sm-fade" style={{ animationDelay: `${ti * 70}ms` }}>
                       <rect x={tp.x - TW/2} y={tp.y - TH/2} width={TW} height={TH} rx={TRND} fill={cfg.bg} stroke={cfg.color} strokeWidth={1.5} strokeOpacity={0.6} filter="url(#shadow)" />
@@ -612,7 +512,7 @@ export default function MarketMap({ competitors, plan = 'starter' }: Props) {
                   )
                 })}
 
-                {displayCompetitors.map((c, ci) => {
+                {competitors.map((c, ci) => {
                   const cp     = cPos.get(c.id)
                   if (!cp) return null
                   const isHov  = hovered === c.id
@@ -621,41 +521,20 @@ export default function MarketMap({ competitors, plan = 'starter' }: Props) {
                   const logo   = hasErr ? null : getLogoUrl(c.website)
                   const init   = (c.name[0] ?? '?').toUpperCase()
                   const d      = dot(c.activity_count ?? 0)
-                  const delta  = timeDeltaFor(c.id)
 
                   return (
                     <g key={c.id} data-interactive="true" transform={`translate(${cp.x} ${cp.y})`} opacity={isVis ? 1 : 0.07}
                       className="sm-fade" style={{ cursor: isVis ? 'pointer' : 'default', animationDelay: `${100 + ci * 35}ms` }}
                       onClick={() => isVis && setSelected(c)} onMouseEnter={() => setHovered(c.id)} onMouseLeave={() => setHovered(null)}>
                       {isHov && <circle r={NODE_R + 8} fill="#6366f1" fillOpacity={0.1} />}
-                      {/* Time machine: pulse ring when risk rose */}
-                      {delta && delta.risk_delta > 10 && (
-                        <circle r={NODE_R + 4} fill="none" stroke="#ef4444" strokeWidth={1.5} strokeOpacity={0.5} strokeDasharray="3 3" />
-                      )}
                       <circle r={NODE_R} fill="white" stroke={isHov ? '#6366f1' : '#e5e7eb'} strokeWidth={isHov ? 2 : 1.5} filter="url(#shadow)" />
                       {logo ? (
                         <image href={logo} x={-(NODE_R-4)} y={-(NODE_R-4)} width={(NODE_R-4)*2} height={(NODE_R-4)*2} clipPath={`url(#cl-${c.id})`} preserveAspectRatio="xMidYMid meet" onError={() => setImgErrors(p => { const s = new Set(p); s.add(c.id); return s })} />
                       ) : (
                         <text textAnchor="middle" dominantBaseline="central" fontSize={12} fontWeight="700" fill="#374151" fontFamily="ui-sans-serif,system-ui,sans-serif">{init}</text>
                       )}
-                      {/* Activity dot or time-machine delta badge */}
-                      {!delta ? (
-                        <><circle cx={NODE_R * 0.7} cy={-NODE_R * 0.7} r={6} fill="white" /><circle cx={NODE_R * 0.7} cy={-NODE_R * 0.7} r={4.5} fill={d} /></>
-                      ) : (
-                        <g transform={`translate(${NODE_R * 0.65} ${-NODE_R * 0.65})`}>
-                          <circle r={9} fill={delta.risk_delta > 5 ? '#ef4444' : delta.risk_delta < -5 ? '#10b981' : '#9ca3af'} />
-                          <text textAnchor="middle" dominantBaseline="central" fontSize={7} fontWeight="700" fill="white" fontFamily="ui-sans-serif,system-ui,sans-serif">
-                            {delta.risk_delta > 0 ? `+${delta.risk_delta}` : delta.risk_delta === 0 ? '=' : `${delta.risk_delta}`}
-                          </text>
-                        </g>
-                      )}
-                      {/* Signal count badge in time machine mode */}
-                      {delta && delta.signals_since > 0 && (
-                        <g transform={`translate(${-NODE_R * 0.65} ${-NODE_R * 0.65})`}>
-                          <circle r={8} fill="#7c3aed" />
-                          <text textAnchor="middle" dominantBaseline="central" fontSize={7} fontWeight="700" fill="white" fontFamily="ui-sans-serif,system-ui,sans-serif">{delta.signals_since > 9 ? '9+' : delta.signals_since}</text>
-                        </g>
-                      )}
+                      <circle cx={NODE_R * 0.7} cy={-NODE_R * 0.7} r={6} fill="white" />
+                      <circle cx={NODE_R * 0.7} cy={-NODE_R * 0.7} r={4.5} fill={d} />
                       {(() => {
                         const tp2 = tPos.get(c.theme)
                         if (!cp || !tp2) return null
@@ -672,36 +551,10 @@ export default function MarketMap({ competitors, plan = 'starter' }: Props) {
               </g>
             </svg>
 
-            {/* Theme badge / Time machine summary */}
-            {timeDays === 0 ? (
-              <div className="absolute top-4 right-4 bg-white/90 border border-gray-200 rounded-full px-3 py-1.5 shadow-sm pointer-events-none">
-                <span className="text-gray-500 text-xs font-medium">✦ {themes.length} major themes detected</span>
-              </div>
-            ) : timeData && (
-              <div className="absolute top-4 right-4 bg-white border border-violet-200 rounded-xl px-4 py-3 shadow-lg max-w-[220px] space-y-2">
-                <p className="text-[10px] font-bold text-violet-700 uppercase tracking-wide">Since {timeDays}d ago</p>
-                {timeData
-                  .filter(t => t.signals_since > 0 || Math.abs(t.risk_delta) > 5)
-                  .sort((a, b) => Math.abs(b.risk_delta) - Math.abs(a.risk_delta))
-                  .slice(0, 5)
-                  .map(t => (
-                    <div key={t.id} className="flex items-start gap-2">
-                      <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded shrink-0 ${
-                        t.risk_delta > 10 ? 'bg-red-100 text-red-600' :
-                        t.risk_delta < -10 ? 'bg-emerald-100 text-emerald-600' :
-                        'bg-gray-100 text-gray-500'
-                      }`}>
-                        {t.risk_delta > 0 ? `▲${t.risk_delta}` : t.risk_delta < 0 ? `▼${Math.abs(t.risk_delta)}` : '—'}
-                      </span>
-                      <div className="min-w-0">
-                        <p className="text-[11px] font-semibold text-gray-800 truncate">{t.name}</p>
-                        {t.signals_since > 0 && <p className="text-[10px] text-violet-500">{t.signals_since} new signal{t.signals_since > 1 ? 's' : ''}</p>}
-                      </div>
-                    </div>
-                  ))
-                }
-              </div>
-            )}
+            {/* Theme count badge */}
+            <div className="absolute top-4 right-4 bg-white/90 border border-gray-200 rounded-full px-3 py-1.5 shadow-sm pointer-events-none">
+              <span className="text-gray-500 text-xs font-medium">✦ {themes.length} major themes detected</span>
+            </div>
 
             {/* Zoom + Sync bar */}
             <div className="absolute bottom-4 left-4 flex items-center gap-2">

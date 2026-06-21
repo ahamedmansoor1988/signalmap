@@ -153,6 +153,11 @@ export default async function CompetitorProfilePage({ params }: { params: { id: 
           )}
         </div>
 
+        {/* ── Signal Timeline ── */}
+        <div className="mb-4">
+          <SignalTimeline competitorId={params.id} plan={plan} />
+        </div>
+
         {/* ── 3-column body ── */}
         <div className="grid grid-cols-3 gap-4">
 
@@ -241,11 +246,6 @@ export default async function CompetitorProfilePage({ params }: { params: { id: 
               <p className="text-xs text-gray-400 mt-0.5">total signals detected</p>
             </div>
           </div>
-        </div>
-
-        {/* ── Signal Timeline ── */}
-        <div className="mt-4">
-          <SignalTimeline competitorId={params.id} plan={plan} />
         </div>
 
         {/* ── Changes feed ── */}

@@ -49,18 +49,15 @@ export default async function MapPage() {
   const { data: { user } } = await supabase.auth.getUser()
 
   let competitors: MapCompetitor[] = []
-  let plan = 'starter'
 
   if (user) {
     const { data: membership } = await supabase
       .from('org_members')
-      .select('org_id, organizations(plan)')
+      .select('org_id')
       .eq('user_id', user.id)
       .maybeSingle()
 
     if (!membership) redirect('/onboarding')
-
-    plan = (membership.organizations as { plan?: string } | null)?.plan ?? 'starter'
 
     if (membership) {
       const { data: dbCompetitors } = await supabase
@@ -118,5 +115,5 @@ export default async function MapPage() {
   }
 
   const data = competitors.length > 0 ? competitors : MOCK_COMPETITORS
-  return <MarketMap competitors={data} plan={plan} />
+  return <MarketMap competitors={data} />
 }
