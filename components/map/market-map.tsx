@@ -4,11 +4,14 @@ import { useState, useRef, useCallback, useEffect } from 'react'
 import { THEME_CONFIG, type Theme } from './mock-data'
 import CompetitorDrawer from './competitor-drawer'
 import {
-  Search, Plus, RefreshCw, X, LayoutGrid, List, Network, Globe, Check, Loader2
+  Search, Plus, RefreshCw, X, LayoutGrid, List, Network, Globe, Check, Loader2,
+  Building2, Zap
 } from 'lucide-react'
 import { getLogoUrl } from '@/lib/get-logo-url'
 import type { TypedAction } from '@/lib/typed-actions'
 import { createClient } from '@/lib/supabase/client'
+import Link from 'next/link'
+import type { SearchResult } from '@/app/api/search/route'
 
 export interface MapCompetitor {
   id: string
@@ -114,6 +117,7 @@ function AddCompetitorModal({ onClose, onAdded }: { onClose: () => void; onAdded
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!name.trim() || !website.trim()) return
+    const normalizedSite = website.trim().startsWith('http') ? website.trim() : `https://${website.trim()}`
     setError(null)
     setStep('syncing')
     setSyncMsg('Adding competitor…')
@@ -129,12 +133,12 @@ function AddCompetitorModal({ onClose, onAdded }: { onClose: () => void; onAdded
       // 2. Insert competitor
       const { data: comp, error: compErr } = await supabase
         .from('competitors')
-        .insert({ org_id: membership.org_id, name: name.trim(), website: website.trim() })
+        .insert({ org_id: membership.org_id, name: name.trim(), website: normalizedSite })
         .select().single()
       if (compErr) throw compErr
 
       // 3. Add home tracked_page
-      const homeUrl = website.trim().replace(/\/$/, '')
+      const homeUrl = normalizedSite.replace(/\/$/, '')
       await supabase.from('tracked_pages').insert({ competitor_id: comp.id, url: homeUrl, label: 'Home' })
 
       // 4. Auto deep-sync
@@ -185,8 +189,7 @@ function AddCompetitorModal({ onClose, onAdded }: { onClose: () => void; onAdded
                   required
                   value={website}
                   onChange={e => setWebsite(e.target.value)}
-                  placeholder="https://crayon.co"
-                  type="url"
+                  placeholder="crayon.co"
                   className="w-full border border-gray-200 rounded-xl pl-9 pr-3 py-2.5 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent"
                 />
               </div>
@@ -237,11 +240,37 @@ export default function MarketMap({ competitors }: Props) {
   const [lastSynced,  setLastSynced]  = useState<string | null>(null)
   const [viewMode,    setViewMode]    = useState<ViewMode>('cluster')
   const [showAddModal, setShowAddModal] = useState(false)
+  const [searchResults, setSearchResults] = useState<SearchResult[]>([])
+  const [searchOpen,    setSearchOpen]    = useState(false)
+  const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const searchRef   = useRef<HTMLDivElement>(null)
 
   // Load last-synced timestamp from localStorage
   useEffect(() => {
     const stored = localStorage.getItem('signalmap_last_synced')
     if (stored) setLastSynced(stored)
+  }, [])
+
+  // Global search — debounced fetch
+  useEffect(() => {
+    if (searchTimer.current) clearTimeout(searchTimer.current)
+    if (!search || search.length < 2) { setSearchResults([]); setSearchOpen(false); return }
+    searchTimer.current = setTimeout(async () => {
+      const res = await fetch(`/api/search?q=${encodeURIComponent(search)}`)
+      const data = await res.json() as { results: SearchResult[] }
+      setSearchResults(data.results ?? [])
+      setSearchOpen(true)
+    }, 250)
+    return () => { if (searchTimer.current) clearTimeout(searchTimer.current) }
+  }, [search])
+
+  // Close search dropdown on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (searchRef.current && !searchRef.current.contains(e.target as Node)) setSearchOpen(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
   }, [])
 
   async function handleSyncNow() {
@@ -319,15 +348,51 @@ export default function MarketMap({ competitors }: Props) {
 
       {/* ── Toolbar ── */}
       <div className="flex items-center gap-2 px-4 py-2.5 border-b border-gray-200 bg-white shrink-0">
-        {/* Search */}
-        <div className="relative">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+        {/* Global search */}
+        <div className="relative" ref={searchRef}>
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
           <input
             value={search}
             onChange={e => setSearch(e.target.value)}
-            placeholder="Search competitors…"
-            className="bg-gray-50 border border-gray-200 rounded-lg pl-8 pr-3 py-1.5 text-xs text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-violet-500 w-48"
+            onFocus={() => { if (searchResults.length) setSearchOpen(true) }}
+            placeholder="Search competitors, signals…"
+            className="bg-gray-50 border border-gray-200 rounded-lg pl-8 pr-8 py-1.5 text-xs text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-violet-500 w-64"
           />
+          {search && (
+            <button onClick={() => { setSearch(''); setSearchResults([]); setSearchOpen(false) }}
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-300 hover:text-gray-500">
+              <X className="w-3 h-3" />
+            </button>
+          )}
+          {/* Dropdown */}
+          {searchOpen && searchResults.length > 0 && (
+            <div className="absolute top-full mt-1 left-0 w-80 bg-white border border-gray-200 rounded-xl shadow-xl z-50 overflow-hidden">
+              {searchResults.map(r => (
+                <Link key={r.id} href={r.href}
+                  onClick={() => { setSearch(''); setSearchOpen(false) }}
+                  className="flex items-start gap-2.5 px-3 py-2.5 hover:bg-gray-50 transition-colors border-b border-gray-50 last:border-0">
+                  <div className={`w-6 h-6 rounded-md flex items-center justify-center shrink-0 mt-0.5 ${r.type === 'competitor' ? 'bg-violet-100' : 'bg-amber-100'}`}>
+                    {r.type === 'competitor'
+                      ? <Building2 className="w-3.5 h-3.5 text-violet-600" />
+                      : <Zap className="w-3.5 h-3.5 text-amber-500" />
+                    }
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-semibold text-gray-900 truncate">{r.title}</p>
+                    <p className="text-[11px] text-gray-400 truncate">{r.subtitle}</p>
+                  </div>
+                  <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded shrink-0 mt-0.5 ${r.type === 'competitor' ? 'bg-violet-50 text-violet-500' : 'bg-amber-50 text-amber-500'}`}>
+                    {r.type === 'competitor' ? 'Competitor' : 'Signal'}
+                  </span>
+                </Link>
+              ))}
+            </div>
+          )}
+          {searchOpen && search.length >= 2 && searchResults.length === 0 && (
+            <div className="absolute top-full mt-1 left-0 w-64 bg-white border border-gray-200 rounded-xl shadow-xl z-50 px-4 py-3">
+              <p className="text-xs text-gray-400">No results for &quot;{search}&quot;</p>
+            </div>
+          )}
         </div>
 
         {/* View toggle */}
