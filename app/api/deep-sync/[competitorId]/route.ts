@@ -4,6 +4,7 @@ import { crawlPage } from '@/lib/crawler'
 import { extractPageData } from '@/lib/extractor'
 import { computeDiff } from '@/lib/diff'
 import { callClaudeJSON } from '@/lib/ai'
+import { fetchCompetitorNews } from '@/lib/news'
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
@@ -17,7 +18,7 @@ const PAGE_MATRIX = [
   { label: 'Newsroom',  paths: ['/newsroom', '/press', '/news', '/about/press'] },
 ]
 
-const DEEP_SIGNAL_PROMPT = `You are a senior competitive intelligence analyst for a PMM (Product Marketing Manager).
+const PAGE_SIGNAL_PROMPT = `You are a senior competitive intelligence analyst for a PMM (Product Marketing Manager).
 Analyze this competitor intelligence and extract strategic signals.
 
 When a "BEFORE" snapshot is provided, focus on what CHANGED and what it means competitively.
@@ -37,6 +38,27 @@ Respond with JSON only:
   ]
 }`
 
+const NEWS_SIGNAL_PROMPT = `You are a senior competitive intelligence analyst for a PMM (Product Marketing Manager).
+Analyze these recent news articles about a competitor and extract the most important strategic signal.
+
+Focus on: funding rounds, partnerships, product launches, executive moves, market expansions, pricing announcements, or analyst coverage.
+Ignore: routine blog posts, republished content, generic industry news that doesn't specifically name the competitor.
+
+Respond with JSON only:
+{
+  "summary": "2-3 sentence strategic summary of what this news means competitively.",
+  "signal": "Sharp one-line PMM alert headline (e.g. 'Notion raised $100M Series C, accelerating enterprise push')",
+  "confidence": 0-100,
+  "risk_score": 0-100,
+  "theme": "AI Features | Pricing | Enterprise | GTM | Content",
+  "top_articles": ["Title of most important article 1", "Title of most important article 2"],
+  "impact_bullets": [
+    "What this means for our positioning",
+    "Recommended response",
+    "Market signal this reveals"
+  ]
+}`
+
 interface WaybackSnapshot {
   url: string
   timestamp: string
@@ -45,7 +67,7 @@ interface WaybackSnapshot {
 
 async function getWaybackSnapshot(url: string, daysAgo = 30): Promise<WaybackSnapshot> {
   const date = new Date(Date.now() - daysAgo * 24 * 60 * 60 * 1000)
-  const ts = date.toISOString().replace(/[^0-9]/g, '').slice(0, 8) // YYYYMMDD
+  const ts = date.toISOString().replace(/[^0-9]/g, '').slice(0, 8)
   try {
     const res = await fetch(
       `https://archive.org/wayback/available?url=${encodeURIComponent(url)}&timestamp=${ts}`,
@@ -83,6 +105,10 @@ interface SignalResult {
   impact_bullets: string[]
 }
 
+interface NewsSignalResult extends SignalResult {
+  top_articles: string[]
+}
+
 export async function POST(_req: NextRequest, { params }: { params: { competitorId: string } }) {
   const userSupabase = await createClient()
   const { data: { user } } = await userSupabase.auth.getUser()
@@ -90,7 +116,6 @@ export async function POST(_req: NextRequest, { params }: { params: { competitor
 
   const supabase = await createServiceClient()
 
-  // Verify competitor belongs to user's org
   const { data: membership } = await userSupabase
     .from('org_members').select('org_id').eq('user_id', user.id).maybeSingle()
   if (!membership) return NextResponse.json({ error: 'No org' }, { status: 403 })
@@ -108,7 +133,6 @@ export async function POST(_req: NextRequest, { params }: { params: { competitor
     ? competitor.website.replace(/\/$/, '')
     : `https://${competitor.website.replace(/\/$/, '')}`
 
-  // Existing tracked pages for this competitor
   const { data: existingPages } = await supabase
     .from('tracked_pages')
     .select('id, url, label')
@@ -116,51 +140,52 @@ export async function POST(_req: NextRequest, { params }: { params: { competitor
 
   const existingUrls = new Set(existingPages?.map(p => p.url) ?? [])
 
-  // ── Step 1: Discover pages ──────────────────────────────────
-  const pagesToProcess: Array<{ id: string; url: string; label: string; isNew: boolean }> = []
+  // ── Step 1: Discover pages + fetch Google News in parallel ──
+  const pagesToProcess: Array<{ id: string; url: string; label: string }> = []
 
-  for (const pageType of PAGE_MATRIX) {
-    // Check if we already track one of these paths
-    const existing = existingPages?.find(p =>
-      pageType.paths.some(path => p.url === `${base}${path}` || (path === '' && p.label?.toLowerCase() === 'home'))
-    )
-
-    if (existing) {
-      pagesToProcess.push({ id: existing.id, url: existing.url, label: existing.label ?? pageType.label, isNew: false })
-      continue
-    }
-
-    // Probe each candidate path
-    for (const path of pageType.paths) {
-      const candidateUrl = `${base}${path}`
-      if (existingUrls.has(candidateUrl)) break
-
-      const ok = await probeUrl(candidateUrl)
-      if (ok) {
-        // Add as new tracked page
-        const { data: newPage } = await supabase
-          .from('tracked_pages')
-          .insert({ competitor_id: competitor.id, url: candidateUrl, label: pageType.label })
-          .select('id')
-          .single()
-
-        if (newPage) {
-          pagesToProcess.push({ id: newPage.id, url: candidateUrl, label: pageType.label, isNew: true })
-          existingUrls.add(candidateUrl)
+  const [, newsItems] = await Promise.all([
+    // Page discovery (sequential probes)
+    (async () => {
+      for (const pageType of PAGE_MATRIX) {
+        const existing = existingPages?.find(p =>
+          pageType.paths.some(path => p.url === `${base}${path}` || (path === '' && p.label?.toLowerCase() === 'home'))
+        )
+        if (existing) {
+          pagesToProcess.push({ id: existing.id, url: existing.url, label: existing.label ?? pageType.label })
+          continue
         }
-        break
+        for (const path of pageType.paths) {
+          const candidateUrl = `${base}${path}`
+          if (existingUrls.has(candidateUrl)) break
+          const ok = await probeUrl(candidateUrl)
+          if (ok) {
+            const { data: newPage } = await supabase
+              .from('tracked_pages')
+              .insert({ competitor_id: competitor.id, url: candidateUrl, label: pageType.label })
+              .select('id').single()
+            if (newPage) {
+              pagesToProcess.push({ id: newPage.id, url: candidateUrl, label: pageType.label })
+              existingUrls.add(candidateUrl)
+            }
+            break
+          }
+        }
       }
-    }
-  }
+    })(),
+    // Google News RSS fetch (runs concurrently with page discovery)
+    fetchCompetitorNews(competitor.name, 30),
+  ])
 
-  // ── Step 2: Process each page ───────────────────────────────
-  const results: Array<{ url: string; label: string; status: string; signal?: string }> = []
+  // ── Step 2: Process pages (cap at 3 to leave time for news) ──
+  const results: Array<{ label: string; url?: string; status: string; signal?: string }> = []
   const now = new Date().toISOString()
   let highestRisk = 0
 
-  for (const page of pagesToProcess.slice(0, 4)) { // cap at 4 pages to fit in 60s
+  // Get home page tracked_page_id for news signals (or first available)
+  const homePage = existingPages?.find(p => p.label?.toLowerCase() === 'home') ?? existingPages?.[0] ?? null
+
+  for (const page of pagesToProcess.slice(0, 3)) {
     try {
-      // Fetch Wayback snapshot (30 days ago) in parallel with current crawl
       const [wayback, current] = await Promise.all([
         getWaybackSnapshot(page.url, 30),
         crawlPage(page.url),
@@ -171,13 +196,12 @@ export async function POST(_req: NextRequest, { params }: { params: { competitor
         try {
           const archived = await crawlPage(wayback.url)
           beforeText = archived.text.slice(0, 4000)
-        } catch { /* wayback fetch failed, proceed without */ }
+        } catch { /* proceed without */ }
       }
 
       const currentText = current.text.slice(0, 4000)
       const parsed = await extractPageData(page.url, current.text, current.html)
 
-      // Store current snapshot
       const { data: snap } = await supabase
         .from('page_snapshots')
         .insert({ tracked_page_id: page.id, text_content: current.text, html_content: current.html.slice(0, 50000), crawled_at: now })
@@ -193,33 +217,15 @@ export async function POST(_req: NextRequest, { params }: { params: { competitor
         parsed_data: parsed as never,
       }, { onConflict: 'tracked_page_id,snapshot_date' })
 
-      // Build AI prompt — richer when we have historical comparison
       const hasHistory = beforeText.length > 100
-      const diffText = hasHistory && beforeText !== currentText
-        ? computeDiff(beforeText, currentText)
-        : null
+      const diffText = hasHistory && beforeText !== currentText ? computeDiff(beforeText, currentText) : null
 
       const promptContent = hasHistory
-        ? `Competitor: ${competitor.name}
-Page: ${page.label} (${page.url})
-Wayback Machine snapshot: 30 days ago
+        ? `Competitor: ${competitor.name}\nPage: ${page.label} (${page.url})\nWayback snapshot: 30 days ago\n\nBEFORE:\n${beforeText}\n\nCURRENT:\n${currentText}\n\n${diffText?.hasChanges ? `KEY CHANGES:\nAdded: ${diffText.addedLines.slice(0, 15).join('\n')}\nRemoved: ${diffText.removedLines.slice(0, 15).join('\n')}` : 'Content similar — extract key positioning signals.'}`
+        : `Competitor: ${competitor.name}\nPage: ${page.label} (${page.url})\n\nCURRENT CONTENT:\n${currentText}`
 
-BEFORE (30 days ago):
-${beforeText}
+      const ai = await callClaudeJSON<SignalResult>(PAGE_SIGNAL_PROMPT, promptContent, 900)
 
-CURRENT:
-${currentText}
-
-${diffText?.hasChanges ? `KEY CHANGES:\nAdded: ${diffText.addedLines.slice(0, 15).join('\n')}\nRemoved: ${diffText.removedLines.slice(0, 15).join('\n')}` : 'Content is similar — extract key strategic positioning signals from the current state.'}`
-        : `Competitor: ${competitor.name}
-Page: ${page.label} (${page.url})
-
-CURRENT CONTENT:
-${currentText}`
-
-      const ai = await callClaudeJSON<SignalResult>(DEEP_SIGNAL_PROMPT, promptContent, 900)
-
-      // Store as change signal
       await supabase.from('changes').insert({
         tracked_page_id: page.id,
         before_snapshot_id: snap?.id ?? null,
@@ -241,17 +247,57 @@ ${currentText}`
     }
   }
 
-  // Update competitor risk + summary
+  // ── Step 3: Process Google News articles ───────────────────
+  let newsSignal: string | undefined
+  if (newsItems.length > 0 && homePage) {
+    try {
+      const articleList = newsItems
+        .slice(0, 15)
+        .map((a, i) => `${i + 1}. [${a.source}] ${a.title}${a.snippet ? ` — ${a.snippet}` : ''} (${a.pubDate})`)
+        .join('\n')
+
+      const newsPrompt = `Competitor: ${competitor.name}
+Source: Google News RSS — last 30 days
+Articles found: ${newsItems.length}
+
+${articleList}`
+
+      const ai = await callClaudeJSON<NewsSignalResult>(NEWS_SIGNAL_PROMPT, newsPrompt, 900)
+
+      await supabase.from('changes').insert({
+        tracked_page_id: homePage.id,
+        before_snapshot_id: null,
+        after_snapshot_id: null,
+        diff_html: null,
+        ai_summary: ai.summary,
+        ai_signal: ai.signal,
+        confidence: ai.confidence,
+        risk_score: ai.risk_score,
+        theme: ai.theme,
+        impact_bullets: ai.impact_bullets,
+        detected_at: now,
+      })
+
+      if (ai.risk_score > highestRisk) highestRisk = ai.risk_score
+      newsSignal = ai.signal
+      results.push({ label: 'News', status: `${newsItems.length} articles`, signal: ai.signal })
+    } catch (err) {
+      results.push({ label: 'News', status: `error: ${String(err).slice(0, 60)}` })
+    }
+  } else {
+    results.push({ label: 'News', status: newsItems.length === 0 ? 'no_articles_found' : 'no_page_to_attach' })
+  }
+
   if (highestRisk > 0) {
-    await supabase.from('competitors')
-      .update({ risk_score: highestRisk })
-      .eq('id', competitor.id)
+    await supabase.from('competitors').update({ risk_score: highestRisk }).eq('id', competitor.id)
   }
 
   return NextResponse.json({
     competitor: competitor.name,
-    pages_processed: results.length,
+    pages_processed: results.filter(r => r.label !== 'News').length,
     pages_with_history: results.filter(r => r.status === 'diff_with_history').length,
+    news_articles_found: newsItems.length,
+    news_signal: newsSignal,
     results,
   })
 }

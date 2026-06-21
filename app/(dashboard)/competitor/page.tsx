@@ -21,6 +21,8 @@ type SyncState = {
   status: 'idle' | 'syncing' | 'done' | 'error'
   pagesProcessed?: number
   pagesWithHistory?: number
+  newsArticlesFound?: number
+  newsSignal?: string
   signals?: Array<{ label: string; signal?: string }>
   error?: string
 }
@@ -92,6 +94,8 @@ export default function CompetitorsPage() {
           status: 'done',
           pagesProcessed: data.pages_processed,
           pagesWithHistory: data.pages_with_history,
+          newsArticlesFound: data.news_articles_found,
+          newsSignal: data.news_signal,
           signals: data.results,
         },
       }))
@@ -170,8 +174,7 @@ export default function CompetitorsPage() {
             <div>
               <p className="text-violet-800 text-xs font-semibold">Deep Sync — 30-day historical intelligence</p>
               <p className="text-violet-600 text-xs mt-0.5 leading-relaxed">
-                Crawls Home, Pricing, Blog, Changelog, and Newsroom for each competitor.
-                Compares against Wayback Machine snapshots from 30 days ago to surface real diffs — pricing moves, new features, messaging shifts, and PR activity.
+                Crawls Home, Pricing, Blog, Changelog, and Newsroom. Compares against Wayback Machine snapshots from 30 days ago. Also pulls Google News RSS for funding rounds, product launches, partnerships, and press coverage.
               </p>
             </div>
           </div>
@@ -295,21 +298,22 @@ export default function CompetitorsPage() {
                         <CheckCircle2 className="w-4 h-4 text-emerald-500 mt-0.5 shrink-0" />
                         <div className="flex-1 min-w-0">
                           <p className="text-emerald-700 text-xs font-semibold">
-                            Deep Sync complete — {sync.pagesProcessed} pages crawled
-                            {(sync.pagesWithHistory ?? 0) > 0
-                              ? `, ${sync.pagesWithHistory} with 30-day Wayback history`
-                              : ' (no Wayback snapshots available)'}
+                            Deep Sync complete — {sync.pagesProcessed} pages
+                            {(sync.pagesWithHistory ?? 0) > 0 ? `, ${sync.pagesWithHistory} with Wayback history` : ''}
+                            {(sync.newsArticlesFound ?? 0) > 0 ? `, ${sync.newsArticlesFound} news articles` : ''}
                           </p>
-                          {sync.signals && sync.signals.length > 0 && (
-                            <ul className="mt-2 space-y-1">
-                              {sync.signals.map((s, i) => s.signal && (
-                                <li key={i} className="text-[11px] text-emerald-800 leading-snug">
-                                  <span className="font-semibold text-emerald-600">{s.label}:</span>{' '}
-                                  {s.signal}
-                                </li>
-                              ))}
-                            </ul>
-                          )}
+                          <ul className="mt-2 space-y-1.5">
+                            {sync.signals?.filter(s => s.label !== 'News' && s.signal).map((s, i) => (
+                              <li key={i} className="text-[11px] text-emerald-800 leading-snug">
+                                <span className="font-semibold text-emerald-600">{s.label}:</span>{' '}{s.signal}
+                              </li>
+                            ))}
+                            {sync.newsSignal && (
+                              <li className="text-[11px] text-violet-800 leading-snug bg-violet-50 rounded px-2 py-1 mt-1">
+                                <span className="font-semibold text-violet-600">📰 News:</span>{' '}{sync.newsSignal}
+                              </li>
+                            )}
+                          </ul>
                         </div>
                       </div>
                     </div>
