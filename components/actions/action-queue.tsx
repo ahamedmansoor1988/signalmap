@@ -1,7 +1,7 @@
 'use client'
 
-import { useMemo, useState } from 'react'
-import { Check, Circle, Clock3, UserRound } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Check, Circle, Clock3, RefreshCw, UserRound } from 'lucide-react'
 import type { Database } from '@/lib/supabase/types'
 
 type Task = Database['public']['Tables']['action_tasks']['Row']
@@ -18,6 +18,21 @@ export default function ActionQueue({ initialTasks, people, userId, defaultRole 
   const [tasks, setTasks] = useState(initialTasks)
   const [scope, setScope] = useState<'mine' | 'team'>('mine')
   const [type, setType] = useState(defaultRole === 'leadership' ? 'all' : defaultRole)
+  const [refreshing, setRefreshing] = useState(false)
+
+  const fetchTasks = useCallback(async () => {
+    setRefreshing(true)
+    try {
+      const res = await fetch('/api/actions')
+      if (res.ok) {
+        const data = await res.json() as { tasks: Task[] }
+        setTasks(data.tasks)
+      }
+    } finally { setRefreshing(false) }
+  }, [])
+
+  // Always fetch fresh data on mount (bypasses SSR staleness)
+  useEffect(() => { void fetchTasks() }, [fetchTasks])
 
   const visible = useMemo(() => tasks.filter(t => {
     if (scope === 'mine' && t.assignee_user_id !== userId) return false
@@ -51,6 +66,10 @@ export default function ActionQueue({ initialTasks, people, userId, defaultRole 
           <option value="marketing">Marketing</option><option value="product">Product</option><option value="general">General</option>
         </select>
         <span className="ml-auto text-xs text-gray-400">{visible.filter(t => t.status !== 'done').length} active</span>
+        <button onClick={() => void fetchTasks()} disabled={refreshing}
+          className="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600 transition-colors disabled:opacity-50">
+          <RefreshCw className={`w-3 h-3 ${refreshing ? 'animate-spin' : ''}`} />
+        </button>
       </div>
 
       {visible.length === 0 ? (
