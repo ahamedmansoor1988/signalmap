@@ -171,19 +171,19 @@ export default function DashboardNav({ user }: { user: SupabaseUser }) {
 
               <div className="py-1">
                 <button
-                  onClick={() => { setMenuOpen(false); router.push('/settings') }}
+                  onClick={() => { setMenuOpen(false); router.push('/profile') }}
                   className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 transition-colors"
                 >
                   <User className="w-3.5 h-3.5 text-gray-400" />
-                  Profile &amp; Settings
+                  Profile
                 </button>
 
                 <button
-                  onClick={() => { setMenuOpen(false); router.push('/settings#plan') }}
+                  onClick={() => { setMenuOpen(false); router.push('/settings') }}
                   className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 transition-colors"
                 >
                   <Zap className="w-3.5 h-3.5 text-violet-400" />
-                  Change plan
+                  Settings &amp; Plan
                 </button>
 
                 <button
