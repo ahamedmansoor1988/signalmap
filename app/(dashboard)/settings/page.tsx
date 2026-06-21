@@ -1,7 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
-import AddCompetitorForm from '@/components/competitor/add-competitor-form'
-import CompetitorList from '@/components/competitor/competitor-list'
 import CompanyProfileForm from '@/components/settings/company-profile-form'
 import PersonalPreferencesForm from '@/components/settings/personal-preferences-form'
 import OrganizationPlanCard from '@/components/settings/organization-plan-card'
@@ -105,22 +103,6 @@ export default async function SettingsPage() {
           </div>
         </section>
 
-        <section className="mb-8">
-          <h2 className="text-gray-900 text-sm font-semibold mb-4">Add Competitor</h2>
-          <div className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
-            <AddCompetitorForm orgId={orgId} />
-          </div>
-        </section>
-
-        <section>
-          <h2 className="text-gray-900 text-sm font-semibold mb-4">
-            Tracked Competitors
-            {competitors?.length ? (
-              <span className="ml-2 text-gray-400 font-normal">({competitors.length})</span>
-            ) : null}
-          </h2>
-          <CompetitorList competitors={competitors ?? []} />
-        </section>
       </div>
     </div>
   )

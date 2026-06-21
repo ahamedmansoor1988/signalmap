@@ -156,14 +156,22 @@ export default function ChangeCard({ change, structuredDiff }: { change: Change;
           {impactBullets.length > 0 && (
             <div>
               <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Impact</p>
-              <ul className="space-y-1.5">
+              <div className="space-y-1.5">
                 {impactBullets.map((bullet, i) => (
-                  <li key={i} className="flex items-start gap-2 text-sm text-gray-700">
+                  <div key={i} className="flex items-start gap-2 bg-gray-50 border border-gray-100 rounded-lg px-3 py-2">
                     <span className="text-violet-400 mt-0.5 shrink-0">•</span>
-                    {bullet}
-                  </li>
+                    <span className="text-sm text-gray-700 flex-1">{bullet}</span>
+                    <button
+                      onClick={(e) => addToQueue(e, i, { type: 'general', action: bullet })}
+                      disabled={queued.has(i) || queueing === i}
+                      className={`flex items-center gap-1 text-[11px] shrink-0 px-2 py-1 rounded-md ${queued.has(i) ? 'text-emerald-600 bg-emerald-50' : 'text-violet-600 bg-white border border-violet-100 hover:bg-violet-50'}`}
+                    >
+                      {queued.has(i) ? <Check className="w-3 h-3" /> : <ListPlus className="w-3 h-3" />}
+                      {queued.has(i) ? 'Queued' : queueing === i ? '…' : 'Add to mine'}
+                    </button>
+                  </div>
                 ))}
-              </ul>
+              </div>
             </div>
           )}
 

@@ -149,7 +149,12 @@ function AddCompetitorModal({ onClose, onAdded }: { onClose: () => void; onAdded
       setStep('done')
       setTimeout(() => { onAdded(comp.id, name.trim()); onClose() }, 1800)
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err))
+      const msg = err instanceof Error
+        ? err.message
+        : typeof err === 'object' && err !== null && 'message' in err
+          ? String((err as { message: unknown }).message)
+          : 'Something went wrong. Please try again.'
+      setError(msg)
       setStep('form')
     }
   }
