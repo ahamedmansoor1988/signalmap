@@ -14,7 +14,7 @@ function UpgradeModal({ currentPlan, onClose }: { currentPlan: string; onClose: 
           <p className="text-sm text-gray-400 mt-1">Monitor more competitors — pricing is per org, not per seat</p>
         </div>
         <div className="p-6 grid grid-cols-2 md:grid-cols-4 gap-3">
-          {PLANS.filter(p => p.id !== 'elite').map(plan => {
+          {PLANS.map(plan => {
             const isCurrent = plan.id === currentPlan
             return (
               <div key={plan.id} className={`relative rounded-xl border p-4 flex flex-col gap-3 ${isCurrent ? 'border-violet-400 bg-violet-50' : 'border-gray-200 hover:border-violet-200'}`}>
@@ -34,8 +34,8 @@ function UpgradeModal({ currentPlan, onClose }: { currentPlan: string; onClose: 
                     ? <p className="text-xl font-bold text-gray-900">Free</p>
                     : <p className="text-xl font-bold text-gray-900">${plan.price}<span className="text-xs font-normal text-gray-400">/mo</span></p>
                   }
-                  {plan.trialDays > 0 && (
-                    <p className="text-[10px] text-emerald-600 font-medium mt-0.5">First {plan.trialDays} days free</p>
+                  {plan.trialDays > 0 && plan.price === 0 && (
+                    <p className="text-[10px] text-emerald-600 font-medium mt-0.5">Then free forever</p>
                   )}
                 </div>
                 <ul className="space-y-1 flex-1">

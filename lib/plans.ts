@@ -10,10 +10,10 @@ export interface Plan {
 }
 
 export const PLANS: Plan[] = [
-  { id: 'starter',  name: 'Starter',  price: 0,   competitors: 5,  trialDays: 0 },
-  { id: 'pro',      name: 'Pro',      price: 50,  competitors: 10, trialDays: 30, badge: '1 month free' },
+  { id: 'starter',  name: 'Starter',  price: 0,   competitors: 5,  trialDays: 30, badge: '1 month free' },
+  { id: 'pro',      name: 'Pro',      price: 50,  competitors: 10, trialDays: 0 },
   { id: 'business', name: 'Business', price: 100, competitors: 20, trialDays: 0 },
-  { id: 'elite',    name: 'Elite',    price: 0,   competitors: -1, trialDays: 0, badge: 'Owner access' },
+  { id: 'elite',    name: 'Elite',    price: 300, competitors: -1, trialDays: 0 },
 ]
 
 export function getPlan(id: string): Plan {
