@@ -56,15 +56,6 @@ async function getWaybackSnapshot(url: string, daysAgo = 30): Promise<{ url: str
   }
 }
 
-async function probeUrl(url: string): Promise<boolean> {
-  try {
-    const res = await fetch(url, {
-      method: 'HEAD', redirect: 'follow', signal: AbortSignal.timeout(5000),
-      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; SignalMap/1.0)' },
-    })
-    return res.ok
-  } catch { return false }
-}
 
 export async function POST(_req: NextRequest, { params }: { params: { competitorId: string } }) {
   const userSupabase = await createClient()
