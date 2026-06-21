@@ -212,7 +212,7 @@ export default function SignalTimeline({ competitorId, plan }: Props) {
         <div className="mx-5 mt-4 bg-violet-50 border border-violet-100 rounded-xl p-4 flex items-start gap-3">
           <Lock className="w-4 h-4 text-violet-500 shrink-0 mt-0.5" />
           <div className="flex-1">
-            <p className="text-sm font-semibold text-violet-800">Unlock 30, 60 &amp; 90-day history</p>
+            <p className="text-sm font-semibold text-violet-800">Unlock 15 &amp; 30-day history</p>
             <p className="text-xs text-violet-600 mt-0.5">Available on Pro, Business and Elite plans.</p>
             <a href="mailto:ahamedmansoor1988@gmail.com?subject=SignalMap upgrade"
               className="inline-flex items-center gap-1 mt-2 text-xs font-semibold text-violet-700 hover:text-violet-900">

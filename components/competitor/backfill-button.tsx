@@ -92,7 +92,7 @@ export default function BackfillButton({ competitorId, plan }: Props) {
           ? progress && progress.total > 0
             ? `Backfilling page ${progress.current}/${progress.total}…`
             : 'Backfilling…'
-          : 'Backfill 90d History'}
+          : 'Backfill 30d History'}
       </button>
 
       {state === 'loading' && (

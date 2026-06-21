@@ -31,7 +31,6 @@ export function isPaid(plan: string): boolean {
 
 export const TIME_PERIODS = [
   { days: 7,  label: '7d',  paid: false },
+  { days: 15, label: '15d', paid: true  },
   { days: 30, label: '30d', paid: true  },
-  { days: 60, label: '60d', paid: true  },
-  { days: 90, label: '90d', paid: true  },
 ] as const
