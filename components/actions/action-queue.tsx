@@ -17,7 +17,7 @@ export default function ActionQueue({ initialTasks, people, userId, defaultRole 
 }) {
   const [tasks, setTasks] = useState(initialTasks)
   const [scope, setScope] = useState<'mine' | 'team'>('mine')
-  const [type, setType] = useState(defaultRole === 'leadership' ? 'all' : defaultRole)
+  const [type, setType] = useState('all') // always default to all — role view is a separate preference
   const [refreshing, setRefreshing] = useState(false)
 
   const fetchTasks = useCallback(async () => {
