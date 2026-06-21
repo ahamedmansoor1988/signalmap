@@ -5,7 +5,8 @@ import { NextRequest, NextResponse } from 'next/server'
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url)
   const code = searchParams.get('code')
-  const next = searchParams.get('next') ?? '/map'
+  const requestedNext = searchParams.get('next') ?? '/map'
+  const next = requestedNext.startsWith('/') && !requestedNext.startsWith('//') ? requestedNext : '/map'
 
   if (code) {
     const cookieStore = await cookies()
@@ -34,6 +35,7 @@ export async function GET(request: NextRequest) {
           .eq('user_id', user.id)
           .maybeSingle()
         if (!membership) {
+          if (next.startsWith('/join/')) return NextResponse.redirect(`${origin}${next}`)
           return NextResponse.redirect(`${origin}/onboarding`)
         }
       }

@@ -96,21 +96,157 @@ export interface Database {
           id: string
           name: string
           slug: string
+          plan: 'starter' | 'growth' | 'scale'
+          competitor_limit: number
           created_at: string
         }
         Insert: {
           id?: string
           name: string
           slug: string
+          plan?: 'starter' | 'growth' | 'scale'
+          competitor_limit?: number
           created_at?: string
         }
         Update: {
           id?: string
           name?: string
           slug?: string
+          plan?: 'starter' | 'growth' | 'scale'
+          competitor_limit?: number
           created_at?: string
         }
         Relationships: []
+      }
+      member_preferences: {
+        Row: {
+          user_id: string
+          org_id: string
+          display_name: string | null
+          role_view: 'all' | 'sales' | 'marketing' | 'product' | 'leadership'
+          browser_notifications: boolean
+          action_notifications: boolean
+          digest_frequency: 'daily' | 'weekly' | 'off'
+          minimum_risk: number
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          user_id: string
+          org_id: string
+          display_name?: string | null
+          role_view?: 'all' | 'sales' | 'marketing' | 'product' | 'leadership'
+          browser_notifications?: boolean
+          action_notifications?: boolean
+          digest_frequency?: 'daily' | 'weekly' | 'off'
+          minimum_risk?: number
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          display_name?: string | null
+          role_view?: 'all' | 'sales' | 'marketing' | 'product' | 'leadership'
+          browser_notifications?: boolean
+          action_notifications?: boolean
+          digest_frequency?: 'daily' | 'weekly' | 'off'
+          minimum_risk?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'member_preferences_org_id_fkey'
+            columns: ['org_id']
+            isOneToOne: false
+            referencedRelation: 'organizations'
+            referencedColumns: ['id']
+          }
+        ]
+      }
+      action_tasks: {
+        Row: {
+          id: string
+          org_id: string
+          change_id: string | null
+          action_index: number
+          action_type: 'sales' | 'marketing' | 'product' | 'general'
+          title: string
+          assignee_user_id: string | null
+          created_by: string
+          status: 'open' | 'in_progress' | 'done' | 'dismissed'
+          due_date: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          org_id: string
+          change_id?: string | null
+          action_index?: number
+          action_type?: 'sales' | 'marketing' | 'product' | 'general'
+          title: string
+          assignee_user_id?: string | null
+          created_by: string
+          status?: 'open' | 'in_progress' | 'done' | 'dismissed'
+          due_date?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          assignee_user_id?: string | null
+          status?: 'open' | 'in_progress' | 'done' | 'dismissed'
+          due_date?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'action_tasks_org_id_fkey'
+            columns: ['org_id']
+            isOneToOne: false
+            referencedRelation: 'organizations'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'action_tasks_change_id_fkey'
+            columns: ['change_id']
+            isOneToOne: false
+            referencedRelation: 'changes'
+            referencedColumns: ['id']
+          }
+        ]
+      }
+      signal_reads: {
+        Row: { user_id: string; change_id: string; seen_at: string }
+        Insert: { user_id: string; change_id: string; seen_at?: string }
+        Update: { seen_at?: string }
+        Relationships: [
+          {
+            foreignKeyName: 'signal_reads_change_id_fkey'
+            columns: ['change_id']
+            isOneToOne: false
+            referencedRelation: 'changes'
+            referencedColumns: ['id']
+          }
+        ]
+      }
+      organization_invites: {
+        Row: {
+          id: string; org_id: string; email: string; role: 'admin' | 'member'; token: string
+          invited_by: string; expires_at: string; accepted_by: string | null; accepted_at: string | null; created_at: string
+        }
+        Insert: {
+          id?: string; org_id: string; email: string; role?: 'admin' | 'member'; token?: string
+          invited_by: string; expires_at?: string; accepted_by?: string | null; accepted_at?: string | null; created_at?: string
+        }
+        Update: { accepted_by?: string | null; accepted_at?: string | null; expires_at?: string }
+        Relationships: [
+          {
+            foreignKeyName: 'organization_invites_org_id_fkey'
+            columns: ['org_id']
+            isOneToOne: false
+            referencedRelation: 'organizations'
+            referencedColumns: ['id']
+          }
+        ]
       }
       org_members: {
         Row: {

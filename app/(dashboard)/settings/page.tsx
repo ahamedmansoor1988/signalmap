@@ -3,6 +3,9 @@ import { redirect } from 'next/navigation'
 import AddCompetitorForm from '@/components/competitor/add-competitor-form'
 import CompetitorList from '@/components/competitor/competitor-list'
 import CompanyProfileForm from '@/components/settings/company-profile-form'
+import PersonalPreferencesForm from '@/components/settings/personal-preferences-form'
+import OrganizationPlanCard from '@/components/settings/organization-plan-card'
+import TeamAccess from '@/components/settings/team-access'
 
 export const metadata = { title: 'Settings — SignalMap' }
 
@@ -13,7 +16,7 @@ export default async function SettingsPage() {
 
   const { data: membership } = await supabase
     .from('org_members')
-    .select('org_id, organizations(id, name, slug)')
+    .select('org_id, role, organizations(id, name, slug)')
     .eq('user_id', user.id)
     .maybeSingle()
 
@@ -42,7 +45,7 @@ export default async function SettingsPage() {
     orgId = membership.org_id
   }
 
-  const [{ data: competitors }, { data: companyProfile }] = await Promise.all([
+  const [{ data: competitors }, { data: companyProfile }, { data: preferences }, { data: organization }] = await Promise.all([
     supabase
       .from('competitors')
       .select('*, tracked_pages(*)')
@@ -53,6 +56,8 @@ export default async function SettingsPage() {
       .select('*')
       .eq('org_id', orgId)
       .maybeSingle(),
+    supabase.from('member_preferences').select('*').eq('user_id', user.id).maybeSingle(),
+    supabase.from('organizations').select('plan, competitor_limit').eq('id', orgId).single(),
   ])
 
   return (
@@ -70,6 +75,27 @@ export default async function SettingsPage() {
             ✦ Re-run setup
           </a>
         </div>
+
+        <section className="mb-8">
+          <h2 className="text-gray-900 text-sm font-semibold mb-1">Team Access</h2>
+          <p className="text-gray-400 text-xs mb-4">Give every teammate an owned queue and private notifications</p>
+          <div className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
+            <TeamAccess isAdmin={!membership || membership.role === 'admin'} />
+          </div>
+        </section>
+
+        <section className="mb-8">
+          <h2 className="text-gray-900 text-sm font-semibold mb-1">My Workspace</h2>
+          <p className="text-gray-400 text-xs mb-4">Your role lens, action reminders and private notification rules</p>
+          <div className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
+            <PersonalPreferencesForm initial={preferences ?? {}} />
+          </div>
+        </section>
+
+        <section className="mb-8">
+          <h2 className="text-gray-900 text-sm font-semibold mb-4">Organization Usage</h2>
+          <OrganizationPlanCard plan={organization?.plan ?? 'starter'} used={competitors?.length ?? 0} limit={organization?.competitor_limit ?? 15} />
+        </section>
 
         <section className="mb-8">
           <h2 className="text-gray-900 text-sm font-semibold mb-1">Company Profile</h2>

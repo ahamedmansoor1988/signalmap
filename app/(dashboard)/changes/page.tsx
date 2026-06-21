@@ -48,9 +48,16 @@ export default async function ChangesPage() {
     .order('detected_at', { ascending: false })
     .limit(100)
 
+  const changeIds = (rawChanges ?? []).map(c => c.id)
+  const { data: readRows } = changeIds.length
+    ? await supabase.from('signal_reads').select('change_id, seen_at').eq('user_id', user.id).in('change_id', changeIds)
+    : { data: [] }
+  const readMap = new Map((readRows ?? []).map(r => [r.change_id, r.seen_at]))
+
   // Attach tracked_pages (with competitor) to each change to match expected shape
   const changes = (rawChanges ?? []).map(c => ({
     ...c,
+    seen_at: readMap.get(c.id) ?? null,
     tracked_pages: pageMap[c.tracked_page_id] ?? null,
   }))
 
@@ -97,17 +104,6 @@ export default async function ChangesPage() {
     ...c,
     structured_diff: (diffsMap.get(c.id) ?? null) as Json | null,
   }))
-
-  // Mark all unseen changes as seen (fire-and-forget, don't block render)
-  if (pageIds.length) {
-    const now = new Date().toISOString()
-    supabase
-      .from('changes')
-      .update({ seen_at: now })
-      .in('tracked_page_id', pageIds)
-      .is('seen_at', null)
-      .then(() => {/* non-blocking */})
-  }
 
   return (
     <div className="h-full overflow-y-auto">

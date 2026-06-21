@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { AlertTriangle, Clock, TrendingUp, ChevronDown, ChevronUp, Eye, Check, ExternalLink } from 'lucide-react'
+import { AlertTriangle, Clock, TrendingUp, ChevronDown, ChevronUp, Eye, Check, ExternalLink, ListPlus } from 'lucide-react'
 import { THEME_CONFIG } from '@/components/map/mock-data'
 import type { Theme } from '@/components/map/mock-data'
 import type { Database } from '@/lib/supabase/types'
@@ -35,6 +35,8 @@ export default function ChangeCard({ change, structuredDiff }: { change: Change;
   const [expanded, setExpanded] = useState(false)
   const [seen, setSeen] = useState(!!change.seen_at)
   const [markingAsSeen, setMarkingAsSeen] = useState(false)
+  const [queued, setQueued] = useState<Set<number>>(new Set())
+  const [queueing, setQueueing] = useState<number | null>(null)
 
   const theme = change.theme as Theme | null
   const cfg = theme && THEME_CONFIG[theme] ? THEME_CONFIG[theme] : null
@@ -54,6 +56,19 @@ export default function ChangeCard({ change, structuredDiff }: { change: Change;
     } finally {
       setMarkingAsSeen(false)
     }
+  }
+
+  async function addToQueue(e: React.MouseEvent, index: number, action: { type: string; action: string }) {
+    e.stopPropagation()
+    if (queued.has(index) || queueing !== null) return
+    setQueueing(index)
+    try {
+      const res = await fetch('/api/actions', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ change_id: change.id, action_index: index, action_type: action.type, title: action.action }),
+      })
+      if (res.ok || res.status === 409) setQueued(s => new Set(Array.from(s).concat(index)))
+    } finally { setQueueing(null) }
   }
 
   return (
@@ -167,7 +182,12 @@ export default function ChangeCard({ change, structuredDiff }: { change: Change;
                       ) : (
                         <span className="text-violet-500 shrink-0 mt-0.5">→</span>
                       )}
-                      <span className="text-sm text-gray-700">{action.action}</span>
+                      <span className="text-sm text-gray-700 flex-1">{action.action}</span>
+                      <button onClick={(e) => addToQueue(e, i, action)} disabled={queued.has(i) || queueing === i}
+                        className={`flex items-center gap-1 text-[11px] shrink-0 px-2 py-1 rounded-md ${queued.has(i) ? 'text-emerald-600 bg-emerald-50' : 'text-violet-600 bg-white border border-violet-100 hover:bg-violet-50'}`}>
+                        {queued.has(i) ? <Check className="w-3 h-3" /> : <ListPlus className="w-3 h-3" />}
+                        {queued.has(i) ? 'Queued' : queueing === i ? 'Adding…' : 'Add to mine'}
+                      </button>
                     </div>
                   )
                 })}

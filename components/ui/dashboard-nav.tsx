@@ -6,7 +6,7 @@ import { useEffect, useState } from 'react'
 import { cn } from '@/lib/utils'
 import {
   Map, Users, GitCompare, BarChart3,
-  Settings, Swords, TrendingUp,
+  Settings, Swords, TrendingUp, ListTodo,
 } from 'lucide-react'
 import type { User } from '@supabase/supabase-js'
 
@@ -14,6 +14,7 @@ const mainNav = [
   { href: '/map',        icon: Map,        label: 'Market Map' },
   { href: '/competitor', icon: Users,       label: 'Competitors' },
   { href: '/changes',    icon: GitCompare,  label: 'Signal Inbox' },
+  { href: '/actions',    icon: ListTodo,     label: 'My Actions' },
   { href: '/brief',      icon: BarChart3,   label: 'Weekly Digest' },
   { href: '/battle',     icon: Swords,      label: 'Battle Room' },
   { href: '/trends',     icon: TrendingUp,  label: 'Trend Timeline' },
@@ -28,14 +29,21 @@ const POLL_INTERVAL = 5 * 60 * 1000
 export default function DashboardNav({ user }: { user: User }) {
   const pathname = usePathname()
   const [unseenCount, setUnseenCount] = useState(0)
+  const [actionCount, setActionCount] = useState(0)
 
   useEffect(() => {
     async function fetchCount() {
       try {
-        const res = await fetch('/api/changes/unseen-count')
-        if (res.ok) {
-          const { count } = await res.json() as { count: number }
+        const [signalsRes, actionsRes] = await Promise.all([
+          fetch('/api/changes/unseen-count'), fetch('/api/actions?mine=true'),
+        ])
+        if (signalsRes.ok) {
+          const { count } = await signalsRes.json() as { count: number }
           setUnseenCount(count)
+        }
+        if (actionsRes.ok) {
+          const { open_count } = await actionsRes.json() as { open_count: number }
+          setActionCount(open_count)
         }
       } catch { /* non-fatal */ }
     }
@@ -66,7 +74,8 @@ export default function DashboardNav({ user }: { user: User }) {
       <div className="flex-1 py-3 flex flex-col items-center gap-1 w-full px-2">
         {mainNav.map(({ href, icon: Icon, label }) => {
           const isChanges = href === '/changes'
-          const badge     = isChanges && unseenCount > 0 ? unseenCount : 0
+          const isActions = href === '/actions'
+          const badge = isChanges && unseenCount > 0 ? unseenCount : isActions ? actionCount : 0
           const isActive  = pathname === href || pathname.startsWith(href + '/')
 
           return (

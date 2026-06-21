@@ -1,5 +1,26 @@
 # SignalMap — Sprint Status
 
+## Sprint 5 — COMPLETE ✅ (Personal workspaces + organization pricing foundation)
+**Date:** 2026-06-21
+
+### Completed
+- [x] **My Actions** — claim AI-recommended Sales, Marketing, and Product actions from a signal; personal/team queues, ownership, due dates, and open/in-progress/done states
+- [x] **Per-user signal reads** — opening or dismissing a signal no longer clears it for the whole organization
+- [x] **Role lenses** — each member chooses Sales, Marketing, Product, Leadership, or All as their default action view
+- [x] **Personal notification rules** — browser signals, assigned-action reminders, digest cadence, and minimum risk threshold are stored per account
+- [x] **Team invitations** — admins create seven-day, email-bound invite links; invited users join the existing organization with their own account
+- [x] **Organization usage tiers** — organizations carry a plan and enforced competitor limit; Settings displays monitored competitor usage and explicitly keeps team seats unlimited
+- [x] **Database protections** — RLS for preferences, tasks, reads, and invites; triggers enforce competitor limits and organization membership for assignees
+- [x] **Production build** — passes compilation, lint/type validation, and static generation (only pre-existing `<img>` optimization warnings)
+
+### Setup required
+Run `supabase/migrations/20260621000000_personal_workspaces.sql` before deploying the application changes.
+
+### Packaging recommendation
+- Starter: up to 15 monitored competitors, unlimited members
+- Growth/Scale: raise `competitor_limit` by organization based on contracted monitoring volume
+- Keep seats unlimited until individual workflow value and multi-user adoption are proven
+
 ## Sprint 3.5 — COMPLETE ✅ (Change Explorer upgrade)
 **Date:** 2026-06-19
 **Commit:** `2de49ac`
