@@ -116,8 +116,17 @@ export default function CompetitorsPage() {
   async function deepSyncAll() {
     if (!competitors?.length) return
     setDeepSyncingAll(true)
+    // Mark all as queued immediately so user sees progress
+    setSyncStates(prev => {
+      const next = { ...prev }
+      for (const c of competitors) {
+        if (!next[c.id] || next[c.id].status === 'idle') {
+          next[c.id] = { status: 'syncing' }
+        }
+      }
+      return next
+    })
     for (const c of competitors) {
-      if (syncStates[c.id]?.status === 'syncing') continue
       await deepSync(c.id)
     }
     setDeepSyncingAll(false)
