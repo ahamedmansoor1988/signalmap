@@ -27,10 +27,15 @@ function parseItems(xml: string): Array<{ title: string; link: string; pubDate: 
   return items
 }
 
+const UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+
 export async function fetchGoogleNews(competitorName: string): Promise<RSSItem[]> {
   const url = `https://news.google.com/rss/search?q=${encodeURIComponent(competitorName)}&hl=en-US&gl=US&ceid=US:en`
   try {
-    const res = await fetch(url, { signal: AbortSignal.timeout(8000) })
+    const res = await fetch(url, {
+      signal: AbortSignal.timeout(8000),
+      headers: { 'User-Agent': UA },
+    })
     if (!res.ok) return []
     const xml = await res.text()
     return parseItems(xml)
