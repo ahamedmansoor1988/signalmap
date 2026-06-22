@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useState } from 'react'
 import { Inbox, Rss, Globe, User, BookmarkPlus, Check, ExternalLink, Filter } from 'lucide-react'
 import type { SignalRow } from '@/app/(dashboard)/inbox/page'
 
@@ -34,13 +34,14 @@ function AssignModal({
 }) {
   const [team, setTeam] = useState('')
   const [email, setEmail] = useState('')
-  const [isPending, startTransition] = useTransition()
+  const [isPending, setIsPending] = useState(false)
   const [error, setError] = useState('')
 
-  function submit() {
+  async function submit() {
     if (!team || !email) { setError('Select a team and enter an email'); return }
     setError('')
-    startTransition(async () => {
+    setIsPending(true)
+    try {
       const res = await fetch('/api/signals/assign', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -52,7 +53,9 @@ function AssignModal({
       } else {
         setError('Failed to assign — try again')
       }
-    })
+    } finally {
+      setIsPending(false)
+    }
   }
 
   return (
@@ -206,7 +209,7 @@ export default function InboxClient({
   const [assignTarget, setAssignTarget] = useState<SignalRow | null>(null)
   const [filter, setFilter] = useState<FilterType>('all')
   const [competitorFilter, setCompetitorFilter] = useState<string>('all')
-  const [isFetching, startFetchTransition] = useTransition()
+  const [isFetching, setIsFetching] = useState(false)
   const [fetchResult, setFetchResult] = useState<string | null>(null)
 
   function handleAssigned(id: string, team: string, email: string) {
@@ -225,23 +228,25 @@ export default function InboxClient({
     })
   }
 
-  function handleFetchSignals() {
+  async function handleFetchSignals() {
+    if (isFetching) return
+    setIsFetching(true)
     setFetchResult(null)
-    startFetchTransition(async () => {
-      try {
-        const res = await fetch('/api/signals/fetch', { method: 'POST' })
-        const data = await res.json() as { inserted?: number; error?: string }
-        if (!res.ok || data.error) {
-          setFetchResult(`Error: ${data.error ?? res.statusText}`)
-        } else if (data.inserted === 0) {
-          setFetchResult('No new signals found — all recent news is already in your inbox')
-        } else {
-          window.location.reload()
-        }
-      } catch {
-        setFetchResult('Network error — try again')
+    try {
+      const res = await fetch('/api/signals/fetch', { method: 'POST' })
+      const data = await res.json() as { inserted?: number; error?: string }
+      if (!res.ok || data.error) {
+        setFetchResult(`Error: ${data.error ?? res.statusText}`)
+      } else if ((data.inserted ?? 0) === 0) {
+        setFetchResult('No new signals found — all recent news is already in your inbox')
+      } else {
+        window.location.reload()
       }
-    })
+    } catch {
+      setFetchResult('Network error — try again')
+    } finally {
+      setIsFetching(false)
+    }
   }
 
   const filtered = signals.filter(s => {

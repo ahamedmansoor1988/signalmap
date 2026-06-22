@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import InboxClient from '@/components/inbox/inbox-client'
 
@@ -22,13 +22,16 @@ export type SignalRow = {
 }
 
 export default async function InboxPage() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const userSupabase = await createClient()
+  const { data: { user } } = await userSupabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const { data: membership } = await supabase
+  const { data: membership } = await userSupabase
     .from('org_members').select('org_id').eq('user_id', user.id).maybeSingle()
   if (!membership) redirect('/onboarding')
+
+  // Use service client to bypass RLS on news_signals (no policy set yet)
+  const supabase = await createServiceClient()
 
   const { data: signals } = await supabase
     .from('news_signals')
