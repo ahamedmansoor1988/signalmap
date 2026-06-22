@@ -124,7 +124,7 @@ export default function OnboardingClient({ orgId, existingCount }: Props) {
 
       const s = await fetchSuggestions()
       setSuggestions(s)
-      setSelected(new Set(s.map((_, i) => i)))
+      setSelected(new Set(s.slice(0, 5).map((_, i) => i)))
       setStep('select')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong')
@@ -164,10 +164,16 @@ export default function OnboardingClient({ orgId, existingCount }: Props) {
     setCustomName(''); setCustomUrl(''); setShowCustom(false)
   }
 
+  const FREE_LIMIT = 5
+
   function toggle(i: number) {
     setSelected(prev => {
       const next = new Set(prev)
-      if (next.has(i)) next.delete(i); else next.add(i)
+      if (next.has(i)) {
+        next.delete(i)
+      } else if (next.size < FREE_LIMIT) {
+        next.add(i)
+      }
       return next
     })
   }
@@ -251,10 +257,14 @@ export default function OnboardingClient({ orgId, existingCount }: Props) {
 
           <div className="flex items-center justify-between mb-4">
             <span className="text-gray-500 text-sm">
-              <span className="text-gray-900 font-medium">{selected.size}</span> of {suggestions.length} selected
+              <span className={`font-medium ${selected.size >= FREE_LIMIT ? 'text-violet-600' : 'text-gray-900'}`}>{selected.size}</span>
+              <span className="text-gray-400"> / {FREE_LIMIT} selected</span>
+              {selected.size >= FREE_LIMIT && (
+                <span className="ml-2 text-xs text-violet-600 bg-violet-50 px-2 py-0.5 rounded-full">Free plan limit</span>
+              )}
             </span>
-            <button onClick={toggleAll} className="text-xs text-violet-600 hover:text-violet-700 transition-colors">
-              {selected.size === suggestions.length ? 'Deselect all' : 'Select all'}
+            <button onClick={() => setSelected(new Set())} className="text-xs text-gray-400 hover:text-gray-600 transition-colors">
+              Deselect all
             </button>
           </div>
 
@@ -265,7 +275,13 @@ export default function OnboardingClient({ orgId, existingCount }: Props) {
               return (
                 <button
                   key={i} onClick={() => toggle(i)}
-                  className={`text-left rounded-xl border p-4 transition-all relative ${isSelected ? 'border-violet-300 bg-violet-50 shadow-sm' : 'border-gray-200 bg-white hover:border-gray-300'}`}
+                  className={`text-left rounded-xl border p-4 transition-all relative ${
+                    isSelected
+                      ? 'border-violet-300 bg-violet-50 shadow-sm'
+                      : selected.size >= FREE_LIMIT
+                        ? 'border-gray-100 bg-gray-50 opacity-50 cursor-not-allowed'
+                        : 'border-gray-200 bg-white hover:border-gray-300'
+                  }`}
                 >
                   {isSelected && (
                     <span className="absolute top-3 right-3 w-5 h-5 rounded-full bg-violet-600 flex items-center justify-center">
