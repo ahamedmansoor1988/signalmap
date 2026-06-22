@@ -112,6 +112,7 @@ function AddCompetitorModal({ onClose, onAdded }: { onClose: () => void; onAdded
   const [step, setStep] = useState<'form' | 'syncing' | 'done'>('form')
   const [syncMsg, setSyncMsg] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const [limitReached, setLimitReached] = useState(false)
   const supabase = createClient()
 
   function isSafeUrl(raw: string): boolean {
@@ -137,21 +138,24 @@ function AddCompetitorModal({ onClose, onAdded }: { onClose: () => void; onAdded
     setSyncMsg('Adding competitor…')
 
     try {
-      // 1. Get org
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) throw new Error('Not authenticated')
-      const { data: membership } = await supabase
-        .from('org_members').select('org_id').eq('user_id', user.id).maybeSingle()
-      if (!membership) throw new Error('No organisation found')
+      // 1. Create competitor via API (enforces plan limits)
+      const createRes = await fetch('/api/competitors', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: name.trim(), website: normalizedSite }),
+      })
+      if (!createRes.ok) {
+        const errData = await createRes.json() as { error?: string; limit?: number }
+        if (errData.error === 'limit_reached') {
+          setLimitReached(true)
+          setStep('form')
+          return
+        }
+        throw new Error(errData.error ?? `Server error ${createRes.status}`)
+      }
+      const comp = await createRes.json() as { id: string; name: string }
 
-      // 2. Insert competitor
-      const { data: comp, error: compErr } = await supabase
-        .from('competitors')
-        .insert({ org_id: membership.org_id, name: name.trim(), website: normalizedSite })
-        .select().single()
-      if (compErr) throw compErr
-
-      // 3. Add home tracked_page
+      // 2. Add home tracked_page
       const homeUrl = normalizedSite.replace(/\/$/, '')
       await supabase.from('tracked_pages').insert({ competitor_id: comp.id, url: homeUrl, label: 'Home' })
 
@@ -217,10 +221,25 @@ function AddCompetitorModal({ onClose, onAdded }: { onClose: () => void; onAdded
               <RefreshCw className="w-3 h-3" />
               We&apos;ll automatically crawl their site and pull 30 days of news signals.
             </p>
+            {limitReached && (
+              <div className="rounded-xl bg-amber-50 border border-amber-200 px-4 py-3">
+                <p className="text-amber-800 text-xs font-semibold mb-1">Competitor limit reached</p>
+                <p className="text-amber-700 text-xs mb-2">
+                  You&apos;ve reached your competitor limit on the free plan.
+                </p>
+                <a
+                  href="/pricing"
+                  className="inline-block text-xs font-semibold text-white bg-violet-600 hover:bg-violet-700 px-3 py-1.5 rounded-lg transition-colors"
+                >
+                  Upgrade to add more →
+                </a>
+              </div>
+            )}
             {error && <p className="text-red-500 text-xs">{error}</p>}
             <button
               type="submit"
-              className="w-full bg-violet-600 text-white text-sm font-semibold py-2.5 rounded-xl hover:bg-violet-700 transition-colors"
+              disabled={limitReached}
+              className="w-full bg-violet-600 text-white text-sm font-semibold py-2.5 rounded-xl hover:bg-violet-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Add &amp; Auto-Sync
             </button>

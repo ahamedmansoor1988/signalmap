@@ -1,5 +1,59 @@
-import { createClient } from '@/lib/supabase/server'
-import { NextResponse } from 'next/server'
+import { createClient, createServiceClient } from '@/lib/supabase/server'
+import { NextRequest, NextResponse } from 'next/server'
+
+// ── POST /api/competitors — create a competitor with plan-limit enforcement ───
+export async function POST(req: NextRequest) {
+  const userSupabase = await createClient()
+
+  let user = null
+  try {
+    const result = await userSupabase.auth.getUser()
+    user = result.data?.user ?? null
+  } catch { /* auth unavailable */ }
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const { data: membership } = await userSupabase
+    .from('org_members')
+    .select('org_id')
+    .eq('user_id', user.id)
+    .maybeSingle()
+  if (!membership) return NextResponse.json({ error: 'No org' }, { status: 403 })
+
+  const supabase = await createServiceClient()
+
+  // Fetch org plan limit
+  const { data: org } = await supabase
+    .from('organizations')
+    .select('competitor_limit')
+    .eq('id', membership.org_id)
+    .single()
+
+  // Count current competitors
+  const { count } = await supabase
+    .from('competitors')
+    .select('id', { count: 'exact', head: true })
+    .eq('org_id', membership.org_id)
+
+  const limit = org?.competitor_limit ?? 5
+  if ((count ?? 0) >= limit) {
+    return NextResponse.json({ error: 'limit_reached', limit }, { status: 403 })
+  }
+
+  const body = await req.json() as { name: string; website: string }
+  if (!body.name?.trim() || !body.website?.trim()) {
+    return NextResponse.json({ error: 'name and website are required' }, { status: 400 })
+  }
+
+  const { data: competitor, error } = await supabase
+    .from('competitors')
+    .insert({ org_id: membership.org_id, name: body.name.trim(), website: body.website.trim() })
+    .select()
+    .single()
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  return NextResponse.json(competitor, { status: 201 })
+}
 
 export async function GET() {
   try {

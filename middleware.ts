@@ -31,9 +31,12 @@ export async function middleware(request: NextRequest) {
     // auth service unavailable — treat as unauthenticated
   }
 
-  const isAuthRoute = request.nextUrl.pathname.startsWith('/login') ||
-    request.nextUrl.pathname.startsWith('/signup')
-  const isInviteRoute = request.nextUrl.pathname.startsWith('/join/')
+  const { pathname } = request.nextUrl
+
+  const isAuthRoute    = pathname.startsWith('/login') || pathname.startsWith('/signup')
+  const isInviteRoute  = pathname.startsWith('/join/')
+  const isOnboarding   = pathname.startsWith('/onboarding')
+  const isPricingRoute = pathname.startsWith('/pricing')
 
   if (!user && !isAuthRoute && !isInviteRoute) {
     const url = request.nextUrl.clone()
@@ -45,6 +48,38 @@ export async function middleware(request: NextRequest) {
     const url = request.nextUrl.clone()
     url.pathname = '/map'
     return NextResponse.redirect(url)
+  }
+
+  // Onboarding check: skip if already on onboarding/pricing/auth/invite,
+  // or if the sm_onboarded cookie is present (set after completing step 3)
+  if (user && !isAuthRoute && !isInviteRoute && !isOnboarding && !isPricingRoute) {
+    const alreadyOnboarded = request.cookies.has('sm_onboarded')
+
+    if (!alreadyOnboarded) {
+      try {
+        const { data: mem } = await supabase
+          .from('org_members')
+          .select('org_id, organizations!inner(name)')
+          .eq('user_id', user.id)
+          .maybeSingle()
+
+        const orgName = (mem?.organizations as { name?: string } | null)?.name
+        if (!mem || orgName === 'My Organization') {
+          const url = request.nextUrl.clone()
+          url.pathname = '/onboarding'
+          return NextResponse.redirect(url)
+        }
+
+        // Org has a real name → set cookie so we don't check again
+        supabaseResponse.cookies.set('sm_onboarded', '1', {
+          path: '/',
+          maxAge: 60 * 60 * 24 * 365,
+          sameSite: 'lax',
+        })
+      } catch {
+        // Don't block the request if the check fails
+      }
+    }
   }
 
   return supabaseResponse
