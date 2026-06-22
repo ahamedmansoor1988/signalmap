@@ -134,16 +134,23 @@ export default function OnboardingClient({ orgId, existingCount, plan }: Props) 
     }
   }
 
+  function normalizeSite(url: string) {
+    return url.replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/\/$/, '').toLowerCase()
+  }
+
   async function handleSuggestMore() {
     setLoadingMore(true)
     try {
       const more = await fetchSuggestions(suggestions.map(s => s.name))
       setSuggestions(prev => {
-        const seen = new Set(prev.map(s => s.website.replace(/^https?:\/\//, '').replace(/\/$/, '').toLowerCase()))
+        const seenUrls  = new Set(prev.map(s => normalizeSite(s.website)))
+        const seenNames = new Set(prev.map(s => s.name.toLowerCase().trim()))
         const deduped = more.filter(s => {
-          const key = s.website.replace(/^https?:\/\//, '').replace(/\/$/, '').toLowerCase()
-          if (seen.has(key)) return false
-          seen.add(key)
+          const urlKey  = normalizeSite(s.website)
+          const nameKey = s.name.toLowerCase().trim()
+          if (seenUrls.has(urlKey) || seenNames.has(nameKey)) return false
+          seenUrls.add(urlKey)
+          seenNames.add(nameKey)
           return true
         })
         return [...prev, ...deduped]
@@ -196,12 +203,15 @@ export default function OnboardingClient({ orgId, existingCount, plan }: Props) 
         if (!res.ok) throw new Error('Failed to clear existing competitors')
       }
 
-      // Deduplicate by normalized website before inserting
-      const seen = new Set<string>()
+      // Deduplicate by normalized website + name before inserting
+      const seenUrls  = new Set<string>()
+      const seenNames = new Set<string>()
       const unique = toAdd.filter(c => {
-        const key = c.website.replace(/^https?:\/\//, '').replace(/\/$/, '').toLowerCase()
-        if (seen.has(key)) return false
-        seen.add(key)
+        const urlKey  = normalizeSite(c.website)
+        const nameKey = c.name.toLowerCase().trim()
+        if (seenUrls.has(urlKey) || seenNames.has(nameKey)) return false
+        seenUrls.add(urlKey)
+        seenNames.add(nameKey)
         return true
       })
 
