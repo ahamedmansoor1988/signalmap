@@ -178,11 +178,6 @@ export default function OnboardingClient({ orgId, existingCount }: Props) {
     })
   }
 
-  function toggleAll() {
-    if (selected.size === suggestions.length) setSelected(new Set())
-    else setSelected(new Set(suggestions.map((_, i) => i)))
-  }
-
   async function handleAdd() {
     const toAdd = suggestions.filter((_, i) => selected.has(i))
     if (!toAdd.length) return
