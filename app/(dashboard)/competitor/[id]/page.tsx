@@ -3,8 +3,6 @@ import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, ExternalLink, TrendingUp, Zap, AlertTriangle } from 'lucide-react'
 import BackfillButton from '@/components/competitor/backfill-button'
-import { THEME_CONFIG } from '@/components/map/mock-data'
-import type { Theme } from '@/components/map/mock-data'
 import RiskSparkline from '@/components/competitor/risk-sparkline'
 import SignalTimeline from '@/components/competitor/signal-timeline'
 
@@ -72,10 +70,6 @@ export default async function CompetitorProfilePage({ params }: { params: { id: 
   const logoUrl = getLogoUrl(competitor.website)
   const domain  = competitor.website.replace(/^https?:\/\//, '')
 
-  // Derive themes from change signals
-  const themeSet = new Set(allChanges.map(c => c.theme).filter(Boolean) as string[])
-  const themes = Array.from(themeSet).slice(0, 5) as Theme[]
-
   // Potential impact bullets from AI summary
   const impactPoints = competitor.ai_summary
     ? competitor.ai_summary.split('. ').filter(s => s.length > 20).slice(0, 3)
@@ -136,22 +130,6 @@ export default async function CompetitorProfilePage({ params }: { params: { id: 
             </div>
           </div>
 
-          {/* Theme tags */}
-          {themes.length > 0 && (
-            <div className="flex items-center gap-2 mt-4 pt-4 border-t border-gray-100">
-              <span className="text-xs text-gray-400">Themes:</span>
-              {themes.map(t => {
-                const cfg = THEME_CONFIG[t]
-                if (!cfg) return null
-                return (
-                  <span key={t} className="text-xs px-2.5 py-0.5 rounded-full font-medium"
-                    style={{ backgroundColor: cfg.bg, color: cfg.color }}>
-                    {cfg.label}
-                  </span>
-                )
-              })}
-            </div>
-          )}
         </div>
 
         {/* ── Signal Timeline ── */}
@@ -172,27 +150,15 @@ export default async function CompetitorProfilePage({ params }: { params: { id: 
               <p className="text-xs text-gray-400 text-center py-8">No signals yet — cron runs daily</p>
             ) : (
               <div className="space-y-3">
-                {recentActivity.map(change => {
-                  const theme = change.theme as Theme | null
-                  const cfg   = theme && THEME_CONFIG[theme] ? THEME_CONFIG[theme] : null
-                  return (
-                    <div key={change.id} className="flex items-start gap-2.5">
-                      <div className="w-1.5 h-1.5 rounded-full bg-violet-400 mt-1.5 shrink-0" />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-xs text-gray-700 leading-snug line-clamp-2">{change.ai_signal ?? 'Change detected'}</p>
-                        <div className="flex items-center gap-2 mt-1">
-                          {cfg && (
-                            <span className="text-[10px] px-1.5 py-0.5 rounded font-medium"
-                              style={{ backgroundColor: cfg.bg, color: cfg.color }}>
-                              {cfg.label}
-                            </span>
-                          )}
-                          <span className="text-[10px] text-gray-400">{timeAgo(change.detected_at)}</span>
-                        </div>
-                      </div>
+                {recentActivity.map(change => (
+                  <div key={change.id} className="flex items-start gap-2.5">
+                    <div className="w-1.5 h-1.5 rounded-full bg-violet-400 mt-1.5 shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs text-gray-700 leading-snug line-clamp-2">{change.ai_signal ?? 'Change detected'}</p>
+                      <span className="text-[10px] text-gray-400">{timeAgo(change.detected_at)}</span>
                     </div>
-                  )
-                })}
+                  </div>
+                ))}
               </div>
             )}
             <Link href="/changes" className="block text-center text-xs text-violet-600 hover:text-violet-800 mt-4 pt-3 border-t border-gray-100">

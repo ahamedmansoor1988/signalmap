@@ -406,6 +406,60 @@ export interface Database {
           }
         ]
       }
+      news_signals: {
+        Row: {
+          id: string
+          competitor_id: string
+          org_id: string
+          title: string
+          summary: string | null
+          url: string | null
+          source_type: string
+          published_at: string
+          ai_impact: string | null
+          ai_counter: string | null
+          assigned_team: string | null
+          assigned_email: string | null
+          assigned_at: string | null
+          added_to_mine: boolean | null
+          created_at: string | null
+        }
+        Insert: {
+          id?: string
+          competitor_id: string
+          org_id: string
+          title: string
+          summary?: string | null
+          url?: string | null
+          source_type?: string
+          published_at?: string
+          ai_impact?: string | null
+          ai_counter?: string | null
+          assigned_team?: string | null
+          assigned_email?: string | null
+          assigned_at?: string | null
+          added_to_mine?: boolean | null
+          created_at?: string | null
+        }
+        Update: {
+          id?: string
+          competitor_id?: string
+          org_id?: string
+          title?: string
+          summary?: string | null
+          url?: string | null
+          source_type?: string
+          published_at?: string
+          ai_impact?: string | null
+          ai_counter?: string | null
+          assigned_team?: string | null
+          assigned_email?: string | null
+          assigned_at?: string | null
+          added_to_mine?: boolean | null
+          created_at?: string | null
+        }
+        Relationships: []
+      }
       changes: {
         Row: {
           id: string
@@ -423,6 +477,10 @@ export interface Database {
           structured_diff: Json | null
           detected_at: string
           seen_at: string | null
+          assigned_team: string | null
+          assigned_email: string | null
+          assigned_at: string | null
+          added_to_mine: boolean | null
         }
         Insert: {
           id?: string
@@ -440,6 +498,10 @@ export interface Database {
           structured_diff?: Json | null
           detected_at?: string
           seen_at?: string | null
+          assigned_team?: string | null
+          assigned_email?: string | null
+          assigned_at?: string | null
+          added_to_mine?: boolean | null
         }
         Update: {
           id?: string
@@ -457,6 +519,10 @@ export interface Database {
           structured_diff?: Json | null
           detected_at?: string
           seen_at?: string | null
+          assigned_team?: string | null
+          assigned_email?: string | null
+          assigned_at?: string | null
+          added_to_mine?: boolean | null
         }
         Relationships: [
           {

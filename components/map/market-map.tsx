@@ -1,8 +1,6 @@
 'use client'
 
 import { useState, useRef, useCallback, useEffect } from 'react'
-import { THEME_CONFIG, type Theme } from './mock-data'
-import CompetitorDrawer from './competitor-drawer'
 import {
   Search, Plus, RefreshCw, X, LayoutGrid, List, Network, Check, Loader2,
   Building2, Zap, Globe
@@ -18,7 +16,7 @@ export interface MapCompetitor {
   name: string
   website: string
   risk_score: number
-  theme: Theme
+  theme: string
   last_signal: string
   signals_count: number
   tracked_pages_count?: number
@@ -288,7 +286,6 @@ function AddCompetitorModal({ onClose, onAdded }: { onClose: () => void; onAdded
 
 // ── Main Component ──────────────────────────────────────────────
 export default function MarketMap({ competitors }: Props) {
-  const [selected,    setSelected]    = useState<MapCompetitor | null>(null)
   const [hovered,     setHovered]     = useState<string | null>(null)
   const [search,      setSearch]      = useState('')
   const [imgErrors,   setImgErrors]   = useState<Set<string>>(new Set())
@@ -531,7 +528,7 @@ export default function MarketMap({ competitors }: Props) {
                     <g key={c.id} data-interactive="true" transform={`translate(${x} ${y})`}
                       opacity={isVis ? 1 : 0.07} className="sm-fade"
                       style={{ cursor: isVis ? 'pointer' : 'default', animationDelay: `${ci * 55}ms` }}
-                      onClick={() => isVis && setSelected(c)}
+                      onClick={() => { /* no-op */ }}
                       onMouseEnter={() => setHovered(c.id)}
                       onMouseLeave={() => setHovered(null)}>
                       {isHov && <circle r={r + 12} fill="#6366f1" fillOpacity={0.07} />}
@@ -611,8 +608,7 @@ export default function MarketMap({ competitors }: Props) {
                     : 'Monitoring…'
                 return (
                   <div key={c.id}
-                    onClick={() => setSelected(c)}
-                    className="bg-white border border-gray-200 rounded-2xl p-4 cursor-pointer hover:border-violet-200 hover:shadow-sm transition-all group"
+                    className="bg-white border border-gray-200 rounded-2xl p-4"
                   >
                     <div className="flex items-start justify-between mb-3">
                       <CompetitorLogo website={c.website} name={c.name} size={10} />
@@ -637,42 +633,34 @@ export default function MarketMap({ competitors }: Props) {
         {viewMode === 'list' && (
           <div className="h-full overflow-y-auto p-4">
             <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm">
-              <div className="grid text-[10px] font-semibold text-gray-400 uppercase tracking-wide px-4 py-2.5 border-b border-gray-100 bg-gray-50" style={{ gridTemplateColumns: '1fr 120px 80px 80px 1fr' }}>
+              <div className="grid text-[10px] font-semibold text-gray-400 uppercase tracking-wide px-4 py-2.5 border-b border-gray-100 bg-gray-50" style={{ gridTemplateColumns: '1fr 100px 80px 1fr' }}>
                 <span>Competitor</span>
-                <span>Theme</span>
                 <span>Risk</span>
                 <span>Signals</span>
                 <span>Latest signal</span>
               </div>
-              {filtered.map((c, i) => {
-                const cfg = THEME_CONFIG[c.theme]
-                return (
-                  <div
-                    key={c.id}
-                    onClick={() => setSelected(c)}
-                    className={`grid items-center px-4 py-3 cursor-pointer hover:bg-gray-50 transition-colors ${i > 0 ? 'border-t border-gray-50' : ''}`}
-                    style={{ gridTemplateColumns: '1fr 120px 80px 80px 1fr' }}
-                  >
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <CompetitorLogo website={c.website} name={c.name} size={8} />
-                      <div className="min-w-0">
-                        <p className="text-sm font-semibold text-gray-900 truncate">{c.name}</p>
-                        <p className="text-xs text-gray-400 truncate">{c.website.replace(/^https?:\/\//, '')}</p>
-                      </div>
+              {filtered.map((c, i) => (
+                <div
+                  key={c.id}
+                  className={`grid items-center px-4 py-3 ${i > 0 ? 'border-t border-gray-50' : ''}`}
+                  style={{ gridTemplateColumns: '1fr 100px 80px 1fr' }}
+                >
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <CompetitorLogo website={c.website} name={c.name} size={8} />
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-gray-900 truncate">{c.name}</p>
+                      <p className="text-xs text-gray-400 truncate">{c.website.replace(/^https?:\/\//, '')}</p>
                     </div>
-                    <span className="text-[10px] px-2 py-0.5 rounded-full font-medium w-fit" style={{ backgroundColor: cfg.bg, color: cfg.color }}>{c.theme}</span>
-                    <RiskBadge score={c.risk_score} />
-                    <span className="text-xs text-gray-500">{c.signals_count}</span>
-                    <p className="text-xs text-gray-500 truncate pr-2">{c.last_signal !== 'No signals yet' ? c.last_signal : '—'}</p>
                   </div>
-                )
-              })}
+                  <RiskBadge score={c.risk_score} />
+                  <span className="text-xs text-gray-500">{c.signals_count}</span>
+                  <p className="text-xs text-gray-500 truncate pr-2">{c.last_signal !== 'No signals yet' ? c.last_signal : '—'}</p>
+                </div>
+              ))}
             </div>
           </div>
         )}
       </div>
-
-      <CompetitorDrawer competitor={selected} open={selected !== null} onClose={() => setSelected(null)} />
 
       {showAddModal && (
         <AddCompetitorModal

@@ -7,15 +7,16 @@ import { cn } from '@/lib/utils'
 import {
   Map, Users, GitCompare, BarChart3,
   Settings, Swords, TrendingUp, ListTodo,
-  Sun, Moon, LogOut, User, Zap,
+  Sun, Moon, LogOut, User, Zap, Inbox,
 } from 'lucide-react'
 import type { User as SupabaseUser } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/client'
 
 const mainNav = [
   { href: '/map',        icon: Map,        label: 'Market Map'      },
+  { href: '/inbox',      icon: Inbox,      label: 'Signal Inbox'    },
   { href: '/competitor', icon: Users,       label: 'Competitors'     },
-  { href: '/changes',    icon: GitCompare,  label: 'Signal Inbox'    },
+  { href: '/changes',    icon: GitCompare,  label: 'Change Feed'     },
   { href: '/actions',    icon: ListTodo,    label: 'My Actions'      },
   { href: '/brief',      icon: BarChart3,   label: 'Weekly Digest'   },
   { href: '/battle',     icon: Swords,      label: 'Battle Room'     },
