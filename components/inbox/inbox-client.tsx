@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Inbox, Rss, Globe, User, BookmarkPlus, Check, ExternalLink, Filter } from 'lucide-react'
+import { Inbox, Rss, Globe, User, BookmarkPlus, Check, ExternalLink, Filter, Zap, Loader2 } from 'lucide-react'
 import type { SignalRow } from '@/app/(dashboard)/inbox/page'
 
 const TEAMS = ['Product', 'Marketing', 'Sales', 'Leadership', 'Engineering']
@@ -110,12 +110,34 @@ function SignalCard({
   signal,
   onAssign,
   onToggleMine,
+  onEnriched,
 }: {
   signal: SignalRow
   onAssign: (s: SignalRow) => void
   onToggleMine: (id: string, current: boolean) => void
+  onEnriched: (id: string, impact: string, counter: string) => void
 }) {
   const isMine = signal.added_to_mine ?? false
+  const [enriching, setEnriching] = useState(false)
+  const [enrichError, setEnrichError] = useState('')
+
+  async function handleAnalyze() {
+    setEnriching(true)
+    setEnrichError('')
+    try {
+      const res = await fetch(`/api/signals/${signal.id}/enrich`, { method: 'POST' })
+      const data = await res.json() as { impact?: string; counter?: string; error?: string }
+      if (data.impact && data.counter) {
+        onEnriched(signal.id, data.impact, data.counter)
+      } else {
+        setEnrichError(data.error?.includes('429') ? 'AI rate limit — try again in a few minutes' : 'Analysis failed — try again')
+      }
+    } catch {
+      setEnrichError('Network error')
+    } finally {
+      setEnriching(false)
+    }
+  }
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 p-4 hover:border-violet-200 transition-colors">
@@ -155,6 +177,21 @@ function SignalCard({
         <div className="bg-emerald-50 rounded-lg px-3 py-2 mb-3">
           <p className="text-[10px] font-semibold text-emerald-600 uppercase tracking-wide mb-0.5">Action</p>
           <p className="text-xs text-gray-700 leading-snug">{signal.ai_counter}</p>
+        </div>
+      )}
+
+      {/* Analyze button when no AI yet */}
+      {!signal.ai_impact && !signal.ai_counter && (
+        <div className="mb-3">
+          <button
+            onClick={handleAnalyze}
+            disabled={enriching}
+            className="text-xs font-medium text-violet-600 hover:text-violet-800 disabled:opacity-50 flex items-center gap-1"
+          >
+            {enriching ? <Loader2 className="w-3 h-3 animate-spin" /> : <Zap className="w-3 h-3" />}
+            {enriching ? 'Analyzing…' : 'Analyze impact'}
+          </button>
+          {enrichError && <p className="text-[10px] text-red-500 mt-1">{enrichError}</p>}
         </div>
       )}
 
@@ -214,6 +251,10 @@ export default function InboxClient({
 
   function handleAssigned(id: string, team: string, email: string) {
     setSignals(prev => prev.map(s => s.id === id ? { ...s, assigned_team: team, assigned_email: email, assigned_at: new Date().toISOString() } : s))
+  }
+
+  function handleEnriched(id: string, impact: string, counter: string) {
+    setSignals(prev => prev.map(s => s.id === id ? { ...s, ai_impact: impact, ai_counter: counter } : s))
   }
 
   function handleToggleMine(id: string, current: boolean) {
@@ -341,6 +382,7 @@ export default function InboxClient({
                 signal={signal}
                 onAssign={setAssignTarget}
                 onToggleMine={handleToggleMine}
+                onEnriched={handleEnriched}
               />
             ))}
           </div>

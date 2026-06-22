@@ -1,8 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { fetchGoogleNews } from '@/lib/rss-fetcher'
-import { callClaudeJSON } from '@/lib/ai'
-import { SIGNAL_IMPACT_SYSTEM } from '@/lib/prompts/signals'
 
 export const runtime = 'nodejs'
 export const maxDuration = 55
@@ -54,14 +52,9 @@ export async function POST() {
     }
   }
 
-  // Run AI + insert in parallel (capped at 10 total to stay fast)
+  // Insert raw signals first (no AI — avoids rate limits, signals appear immediately)
   const inserts = await Promise.allSettled(
-    toProcess.slice(0, 10).map(async ({ competitor, item }) => {
-      const ai = await callClaudeJSON<{ impact: string; counter: string }>(
-        SIGNAL_IMPACT_SYSTEM,
-        `Competitor: ${competitor.name}\nHeadline: ${item.title}\nSummary: ${item.summary}`,
-        250
-      )
+    toProcess.slice(0, 15).map(async ({ competitor, item }) => {
       await supabase.from('news_signals').insert({
         competitor_id: competitor.id,
         org_id:        membership.org_id,
@@ -70,8 +63,8 @@ export async function POST() {
         url:           item.link,
         source_type:   item.source,
         published_at:  item.pubDate,
-        ai_impact:     ai.impact,
-        ai_counter:    ai.counter,
+        ai_impact:     null,
+        ai_counter:    null,
       })
       return item.link
     })
