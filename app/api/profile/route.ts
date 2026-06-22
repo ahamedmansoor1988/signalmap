@@ -42,7 +42,7 @@ export async function DELETE() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const service = await createServiceClient()
+  const service = createServiceClient()
 
   // Remove from org_members first (RLS won't let user delete themselves)
   await service.from('org_members').delete().eq('user_id', user.id)

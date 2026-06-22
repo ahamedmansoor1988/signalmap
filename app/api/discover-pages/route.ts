@@ -48,7 +48,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const supabase = await createServiceClient()
+  const supabase = createServiceClient()
 
   const { data: competitors } = await supabase
     .from('competitors')

@@ -34,7 +34,7 @@ export async function POST(req: NextRequest) {
   if (!membership) return NextResponse.json({ error: 'No org' }, { status: 403 })
 
   const body = await req.json() as OnboardingBody
-  const supabase = await createServiceClient()
+  const supabase = createServiceClient()
 
   // Update org name
   await supabase

@@ -50,7 +50,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const supabase = await createServiceClient()
+  const supabase = createServiceClient()
   const results: Array<{ page_id: string; url: string; tier: string; status: string; change_id?: string }> = []
   const today = new Date().toISOString().split('T')[0]
 

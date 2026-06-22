@@ -47,7 +47,7 @@ export async function generateWeeklyBrief(): Promise<WeeklyBriefResult> {
   }
 
   const resend = new Resend(process.env.RESEND_API_KEY)
-  const supabase = await createServiceClient()
+  const supabase = createServiceClient()
   const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
   const weekStart = getMondayOfWeek(new Date())
 

@@ -43,7 +43,7 @@ export async function POST() {
     if (!membership) return NextResponse.json({ error: 'No org found' }, { status: 404 })
 
     // Use service client for writes
-    const supabase = await createServiceClient()
+    const supabase = createServiceClient()
 
     // Get all tracked pages for this org (home pages only for speed)
     const { data: competitors } = await supabase

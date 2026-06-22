@@ -19,7 +19,7 @@ export async function POST(req: NextRequest) {
     .maybeSingle()
   if (!membership) return NextResponse.json({ error: 'No org' }, { status: 403 })
 
-  const supabase = await createServiceClient()
+  const supabase = createServiceClient()
 
   // Fetch org plan limit
   const { data: org } = await supabase

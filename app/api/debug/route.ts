@@ -12,7 +12,7 @@ export async function GET() {
   const { data: membership } = await userSupabase
     .from('org_members').select('org_id').eq('user_id', user.id).maybeSingle()
 
-  const supabase = await createServiceClient()
+  const supabase = createServiceClient()
   const { data: competitors } = await supabase
     .from('competitors').select('id, name').eq('org_id', membership?.org_id ?? '').limit(1)
 

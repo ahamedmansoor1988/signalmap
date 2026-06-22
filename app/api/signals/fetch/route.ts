@@ -14,7 +14,7 @@ export async function POST() {
     .from('org_members').select('org_id').eq('user_id', user.id).maybeSingle()
   if (!membership) return NextResponse.json({ error: 'No org' }, { status: 403 })
 
-  const supabase = await createServiceClient()
+  const supabase = createServiceClient()
 
   const { data: competitors } = await supabase
     .from('competitors').select('id, name, website').eq('org_id', membership.org_id)

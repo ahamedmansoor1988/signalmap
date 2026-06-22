@@ -85,7 +85,7 @@ export async function POST(
     .maybeSingle()
   if (!membership) return NextResponse.json({ error: 'No org' }, { status: 403 })
 
-  const supabase = await createServiceClient()
+  const supabase = createServiceClient()
 
   // Verify competitor belongs to this org
   const { data: competitor } = await supabase

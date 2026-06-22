@@ -15,7 +15,7 @@ export interface ScanPage {
 }
 
 export async function POST(_req: NextRequest, { params }: { params: { id: string } }) {
-  const supabase = await createServiceClient()
+  const supabase = createServiceClient()
 
   const { data: pages } = await supabase
     .from('tracked_pages')

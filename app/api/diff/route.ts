@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'before_snapshot_id, after_snapshot_id, tracked_page_id required' }, { status: 400 })
     }
 
-    const supabase = await createServiceClient()
+    const supabase = createServiceClient()
 
     const [{ data: before }, { data: after }] = await Promise.all([
       supabase.from('page_snapshots').select('text_content').eq('id', before_snapshot_id).single(),

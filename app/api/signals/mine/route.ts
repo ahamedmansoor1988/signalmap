@@ -12,7 +12,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Missing fields' }, { status: 400 })
   }
 
-  const supabase = await createServiceClient()
+  const supabase = createServiceClient()
 
   const { error } = await supabase
     .from('news_signals')

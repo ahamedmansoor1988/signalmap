@@ -68,7 +68,7 @@ export async function POST(_req: NextRequest, { params }: { params: { competitor
   const { data: { user } } = await userSupabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const supabase = await createServiceClient()
+  const supabase = createServiceClient()
 
   const { data: membership } = await userSupabase
     .from('org_members').select('org_id').eq('user_id', user.id).maybeSingle()

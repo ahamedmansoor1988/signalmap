@@ -21,7 +21,7 @@ export async function sendDigest(): Promise<DigestResult> {
   }
 
   const resend = new Resend(process.env.RESEND_API_KEY)
-  const supabase = await createServiceClient()
+  const supabase = createServiceClient()
   const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
 
   // 1. Fetch competitor_diffs from the last 24 hours
