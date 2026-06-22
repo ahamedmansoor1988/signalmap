@@ -1,7 +1,8 @@
 'use client'
 
 import { useState } from 'react'
-import { Inbox, Rss, Globe, User, BookmarkPlus, Check, ExternalLink, Filter, Zap, Loader2 } from 'lucide-react'
+import { Inbox, Rss, Globe, User, BookmarkPlus, Check, ExternalLink, Filter, Zap, Loader2, GitBranch, Rocket, Briefcase, Smartphone, FileText, Newspaper } from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
 import type { SignalRow } from '@/app/(dashboard)/inbox/page'
 
 const TEAMS = ['Product', 'Marketing', 'Sales', 'Leadership', 'Engineering']
@@ -17,10 +18,26 @@ function timeAgo(date: string) {
   return 'just now'
 }
 
+const SOURCE_CONFIG: Record<string, { icon: LucideIcon; color: string; label: string }> = {
+  google_news:    { icon: Globe,       color: 'text-blue-400',   label: 'News'      },
+  blog_rss:       { icon: Rss,         color: 'text-orange-400', label: 'Blog'      },
+  github_release: { icon: GitBranch,   color: 'text-gray-600',   label: 'GitHub'    },
+  product_hunt:   { icon: Rocket,      color: 'text-orange-500', label: 'PH'        },
+  job_postings:   { icon: Briefcase,   color: 'text-green-500',  label: 'Hiring'    },
+  app_store:      { icon: Smartphone,  color: 'text-blue-500',   label: 'App Store' },
+  changelog:      { icon: FileText,    color: 'text-violet-500', label: 'Changelog' },
+  press:          { icon: Newspaper,   color: 'text-gray-500',   label: 'Press'     },
+}
+
 function SourceIcon({ type }: { type: string }) {
-  return type === 'google_news'
-    ? <Globe className="w-3 h-3 text-blue-400" />
-    : <Rss className="w-3 h-3 text-orange-400" />
+  const cfg = SOURCE_CONFIG[type]
+  if (!cfg) return <Globe className="w-3 h-3 text-gray-400" />
+  const Icon = cfg.icon
+  return <Icon className={`w-3 h-3 ${cfg.color}`} />
+}
+
+function SourceLabel({ type }: { type: string }) {
+  return <span className="text-[10px] text-gray-400">{SOURCE_CONFIG[type]?.label ?? type}</span>
 }
 
 function AssignModal({
@@ -145,6 +162,8 @@ function SignalCard({
       <div className="flex items-start justify-between gap-2 mb-2">
         <div className="flex items-center gap-1.5 min-w-0">
           <SourceIcon type={signal.source_type} />
+          <SourceLabel type={signal.source_type} />
+          <span className="text-[10px] text-gray-300">·</span>
           <span className="text-[10px] text-gray-400 font-medium">
             {signal.competitors?.name ?? '—'}
           </span>

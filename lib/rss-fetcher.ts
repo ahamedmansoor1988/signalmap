@@ -11,7 +11,7 @@ function extractTag(block: string, tag: string): string {
   return m?.[1]?.trim() ?? ''
 }
 
-function parseItems(xml: string): Array<{ title: string; link: string; pubDate: string; description: string }> {
+export function parseItems(xml: string): Array<{ title: string; link: string; pubDate: string; description: string }> {
   const items: Array<{ title: string; link: string; pubDate: string; description: string }> = []
   const re = /<item[\s>]([\s\S]*?)<\/item>/gi
   let m

@@ -1,6 +1,13 @@
 import { NextResponse } from 'next/server'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { fetchGoogleNews, fetchBlogRSS } from '@/lib/rss-fetcher'
+import { fetchChangelog } from '@/lib/pipeline/changelog'
+import { fetchPress } from '@/lib/pipeline/press'
+import { fetchGitHub } from '@/lib/pipeline/github'
+import { fetchProductHunt } from '@/lib/pipeline/producthunt'
+import { fetchJobs } from '@/lib/pipeline/jobs'
+import { fetchAppStore } from '@/lib/pipeline/appstore'
+import type { PipelineItem } from '@/lib/pipeline/types'
 
 export const runtime = 'nodejs'
 export const maxDuration = 55
@@ -20,19 +27,6 @@ export async function POST() {
     .from('competitors').select('id, name, website').eq('org_id', membership.org_id)
   if (!competitors?.length) return NextResponse.json({ inserted: 0 })
 
-  // Get stored RSS/blog URLs from tracked_pages (discovered via "Discover Content Sources")
-  const { data: trackedPages } = await supabase
-    .from('tracked_pages')
-    .select('competitor_id, url, label')
-    .in('competitor_id', competitors.map(c => c.id))
-    .or('label.ilike.%blog%,label.ilike.%rss%,label.ilike.%news%,label.ilike.%changelog%')
-
-  const rssUrlsByCompetitor: Record<string, string[]> = {}
-  for (const page of trackedPages ?? []) {
-    if (!rssUrlsByCompetitor[page.competitor_id]) rssUrlsByCompetitor[page.competitor_id] = []
-    rssUrlsByCompetitor[page.competitor_id].push(page.url)
-  }
-
   const { data: existing } = await supabase
     .from('news_signals').select('url')
     .eq('org_id', membership.org_id)
@@ -42,57 +36,68 @@ export async function POST() {
   const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
 
   type Competitor = typeof competitors[0]
-  type RSSItem = Awaited<ReturnType<typeof fetchGoogleNews>>[0]
 
-  // Fetch Google News + stored blog RSS for all competitors in parallel
-  const fetchResults = await Promise.allSettled(
+  const toInsert: Array<{ competitor: Competitor; item: PipelineItem }> = []
+
+  await Promise.allSettled(
     competitors.map(async (competitor) => {
-      const storedRssUrls = rssUrlsByCompetitor[competitor.id] ?? []
-
-      // If no stored URLs, fall back to guessing common feed paths
-      const rssTargets = storedRssUrls.length > 0
-        ? storedRssUrls
-        : (competitor.website ? [competitor.website] : [])
-
-      const [news, ...blogResults] = await Promise.all([
+      const [news, blog, changelog, press, github, producthunt, jobs, appstore] = await Promise.allSettled([
         fetchGoogleNews(competitor.name, competitor.website),
-        ...rssTargets.map(url => fetchBlogRSS(url)),
+        fetchBlogRSS(competitor.website),
+        fetchChangelog(competitor, existingUrls),
+        fetchPress(competitor, existingUrls),
+        fetchGitHub(competitor, existingUrls),
+        fetchProductHunt(competitor, existingUrls),
+        fetchJobs(competitor, existingUrls),
+        fetchAppStore(competitor, existingUrls),
       ])
 
-      const blogItems = blogResults.flat()
+      const newsItems = (news.status === 'fulfilled' ? news.value : []).map(i => ({
+        title: i.title, summary: i.summary, url: i.link,
+        source_type: i.source, published_at: i.pubDate,
+      }))
+      const blogItems = (blog.status === 'fulfilled' ? blog.value : []).map(i => ({
+        title: i.title, summary: i.summary, url: i.link,
+        source_type: i.source, published_at: i.pubDate,
+      }))
 
-      const items = [...blogItems, ...news] // blog first (more authoritative)
-        .filter(i => i.link && !existingUrls.has(i.link))
-        .filter(i => new Date(i.pubDate) >= sevenDaysAgo)
+      const allItems: PipelineItem[] = [
+        ...blogItems,
+        ...(changelog.status === 'fulfilled' ? changelog.value : []),
+        ...(press.status === 'fulfilled' ? press.value : []),
+        ...(github.status === 'fulfilled' ? github.value : []),
+        ...(producthunt.status === 'fulfilled' ? producthunt.value : []),
+        ...(jobs.status === 'fulfilled' ? jobs.value : []),
+        ...(appstore.status === 'fulfilled' ? appstore.value : []),
+        ...newsItems,
+      ]
+
+      const deduped = allItems
+        .filter(i => i.url && !existingUrls.has(i.url))
+        .filter(i => new Date(i.published_at) >= sevenDaysAgo)
         .slice(0, 5)
 
-      return { competitor, items }
+      for (const item of deduped) {
+        existingUrls.add(item.url)
+        toInsert.push({ competitor, item })
+      }
     })
   )
 
-  const toProcess: Array<{ competitor: Competitor; item: RSSItem }> = []
-  for (const r of fetchResults) {
-    if (r.status === 'fulfilled') {
-      for (const item of r.value.items) {
-        toProcess.push({ competitor: r.value.competitor, item })
-      }
-    }
-  }
-
   const inserts = await Promise.allSettled(
-    toProcess.slice(0, 20).map(async ({ competitor, item }) => {
+    toInsert.slice(0, 20).map(async ({ competitor, item }) => {
       await supabase.from('news_signals').insert({
         competitor_id: competitor.id,
         org_id:        membership.org_id,
         title:         item.title,
         summary:       item.summary,
-        url:           item.link,
-        source_type:   item.source,
-        published_at:  item.pubDate,
+        url:           item.url,
+        source_type:   item.source_type,
+        published_at:  item.published_at,
         ai_impact:     null,
         ai_counter:    null,
       })
-      return item.link
+      return item.url
     })
   )
 
