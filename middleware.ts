@@ -34,11 +34,12 @@ export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
   const isAuthRoute    = pathname.startsWith('/login') || pathname.startsWith('/signup')
+  const isAuthCallback = pathname.startsWith('/auth/')
   const isInviteRoute  = pathname.startsWith('/join/')
   const isOnboarding   = pathname.startsWith('/onboarding')
   const isPricingRoute = pathname.startsWith('/pricing')
 
-  if (!user && !isAuthRoute && !isInviteRoute) {
+  if (!user && !isAuthRoute && !isAuthCallback && !isInviteRoute) {
     const url = request.nextUrl.clone()
     url.pathname = '/login'
     return NextResponse.redirect(url)
