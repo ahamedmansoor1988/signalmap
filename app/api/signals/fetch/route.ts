@@ -31,7 +31,7 @@ export async function POST() {
   // Fetch Google News for all competitors in parallel
   const fetchResults = await Promise.allSettled(
     competitors.map(async (competitor) => {
-      const news = await fetchGoogleNews(competitor.name)
+      const news = await fetchGoogleNews(competitor.name, competitor.website)
       const items = news
         .filter(i => i.link && !existingUrls.has(i.link))
         .filter(i => new Date(i.pubDate) >= sevenDaysAgo)
