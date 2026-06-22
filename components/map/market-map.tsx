@@ -40,13 +40,13 @@ const CX = W / 2
 const CY = H / 2 + 30
 
 // ── Sizes ──────────────────────────────────────────────────────
-const THEME_R = 280
-const COMP_D  = 130
 const NODE_R  = 22
-const TW      = 126
-const TH      = 48
-const TRND    = 10
-const FAN     = Math.PI
+
+const RINGS = [
+  { r: 445, label: 'MONITOR',     fill: '#f8fafc', stroke: '#cbd5e1', textFill: '#94a3b8' },
+  { r: 315, label: 'MEDIUM RISK', fill: '#fffbeb', stroke: '#fde68a', textFill: '#ca8a04' },
+  { r: 185, label: 'HIGH RISK',   fill: '#fff1f2', stroke: '#fecaca', textFill: '#ef4444' },
+]
 
 function dot(count: number) {
   if (!count)    return '#d1d5db'
@@ -54,31 +54,27 @@ function dot(count: number) {
   return '#ef4444'
 }
 
-function layout(competitors: MapCompetitor[]) {
-  const all    = Object.keys(THEME_CONFIG) as Theme[]
-  const themes = all.filter(t => competitors.some(c => c.theme === t))
-  const N      = themes.length
-
-  const tPos = new Map<Theme, { x: number; y: number; angle: number }>()
-  themes.forEach((theme, i) => {
-    const angle = -Math.PI / 2 + (i / N) * 2 * Math.PI
-    tPos.set(theme, { x: CX + THEME_R * Math.cos(angle), y: CY + THEME_R * Math.sin(angle), angle })
-  })
+function ringLayout(competitors: MapCompetitor[]) {
+  const high   = competitors.filter(c => c.risk_score >= 75)
+  const medium = competitors.filter(c => c.risk_score >= 45 && c.risk_score < 75)
+  const low    = competitors.filter(c => c.risk_score < 45)
 
   const cPos = new Map<string, { x: number; y: number }>()
-  for (const theme of themes) {
-    const tp    = tPos.get(theme)!
-    const group = competitors.filter(c => c.theme === theme)
-    const Nc    = group.length
-    if (!Nc) continue
-    const step = Nc > 1 ? FAN / (Nc - 1) : 0
-    group.forEach((comp, i) => {
-      const a = tp.angle - FAN / 2 + i * step
-      cPos.set(comp.id, { x: tp.x + COMP_D * Math.cos(a), y: tp.y + COMP_D * Math.sin(a) })
+
+  function place(comps: MapCompetitor[], radius: number) {
+    const N = comps.length
+    if (!N) return
+    comps.forEach((comp, i) => {
+      const angle = -Math.PI / 2 + (i / N) * 2 * Math.PI
+      cPos.set(comp.id, { x: CX + radius * Math.cos(angle), y: CY + radius * Math.sin(angle) })
     })
   }
 
-  return { tPos, cPos, themes }
+  place(high,   185)
+  place(medium, 315)
+  place(low,    445)
+
+  return cPos
 }
 
 function RiskBadge({ score }: { score: number }) {
@@ -333,7 +329,7 @@ export default function MarketMap({ competitors }: Props) {
   const dragStart = useRef({ mx: 0, my: 0, px: 0, py: 0 })
   const svgRef    = useRef<SVGSVGElement>(null)
 
-  const { tPos, cPos, themes } = layout(competitors)
+  const cPos = ringLayout(competitors)
   const q   = search.toLowerCase()
   const vis = (c: MapCompetitor) => !q || c.name.toLowerCase().includes(q) || c.theme.toLowerCase().includes(q)
 
@@ -493,60 +489,27 @@ export default function MarketMap({ competitors }: Props) {
               </defs>
 
               <g transform={`translate(${pan.x + W/2 * (1 - zoom)} ${pan.y + H/2 * (1 - zoom)}) scale(${zoom})`}>
-                <circle cx={CX} cy={CY} r={6} fill="#e5e7eb" />
-                <circle cx={CX} cy={CY} r={3} fill="#9ca3af" />
 
-                {themes.map(theme => {
-                  const tp  = tPos.get(theme)!
-                  const cfg = THEME_CONFIG[theme]
-                  const dx  = tp.x - CX
-                  const dy  = tp.y - CY
-                  const len = Math.sqrt(dx*dx + dy*dy) || 1
-                  const ex  = CX + (dx/len) * (THEME_R - TW/2 - 6)
-                  const ey  = CY + (dy/len) * (THEME_R - TH/2 - 6)
-                  return <line key={`spoke-${theme}`} x1={CX} y1={CY} x2={ex} y2={ey} stroke={cfg.color} strokeWidth={1} strokeOpacity={0.15} />
-                })}
+                {/* Concentric risk rings — outermost first so inner fills on top */}
+                {RINGS.map(ring => (
+                  <g key={ring.label}>
+                    <circle cx={CX} cy={CY} r={ring.r} fill={ring.fill} stroke={ring.stroke} strokeWidth={1.5} />
+                    <text x={CX} y={CY - ring.r + 18} textAnchor="middle" fontSize={10} fontWeight="600"
+                      fill={ring.textFill} letterSpacing="0.1em" fontFamily="ui-sans-serif,system-ui,sans-serif">
+                      {ring.label}
+                    </text>
+                  </g>
+                ))}
 
-                {themes.map(theme => {
-                  const tp  = tPos.get(theme)!
-                  const cfg = THEME_CONFIG[theme]
-                  return competitors.filter(c => c.theme === theme).map(c => {
-                    const cp = cPos.get(c.id)
-                    if (!cp) return null
-                    const dx  = cp.x - tp.x
-                    const dy  = cp.y - tp.y
-                    const len = Math.sqrt(dx*dx + dy*dy) || 1
-                    const hw  = TW/2 + 4
-                    const hh  = TH/2 + 4
-                    let sx: number, sy: number
-                    if (Math.abs(dy) * hw < Math.abs(dx) * hh) {
-                      sx = tp.x + Math.sign(dx) * hw; sy = tp.y + (dy/dx) * Math.sign(dx) * hw
-                    } else {
-                      sx = tp.x + (dx/dy) * Math.sign(dy) * hh; sy = tp.y + Math.sign(dy) * hh
-                    }
-                    const ex = cp.x - (dx/len) * (NODE_R + 2)
-                    const ey = cp.y - (dy/len) * (NODE_R + 2)
-                    const mx = (sx + ex)/2 - (dy/len)*24
-                    const my = (sy + ey)/2 + (dx/len)*24
-                    return <path key={c.id} d={`M ${sx} ${sy} Q ${mx} ${my} ${ex} ${ey}`} fill="none" stroke={cfg.color} strokeWidth={1.3} strokeOpacity={vis(c) ? 0.35 : 0.04} />
-                  })
-                })}
+                {/* Center "YOU" node */}
+                <circle cx={CX} cy={CY} r={44} fill="#1e1b4b" filter="url(#shadow)" />
+                <text x={CX} y={CY} textAnchor="middle" dominantBaseline="central"
+                  fontSize={11} fontWeight="700" fill="white" letterSpacing="0.06em"
+                  fontFamily="ui-sans-serif,system-ui,sans-serif">YOU</text>
 
-                {themes.map((theme, ti) => {
-                  const tp  = tPos.get(theme)!
-                  const cfg = THEME_CONFIG[theme]
-                  const cnt = competitors.filter(c => c.theme === theme).length
-                  return (
-                    <g key={theme} className="sm-fade" style={{ animationDelay: `${ti * 70}ms` }}>
-                      <rect x={tp.x - TW/2} y={tp.y - TH/2} width={TW} height={TH} rx={TRND} fill={cfg.bg} stroke={cfg.color} strokeWidth={1.5} strokeOpacity={0.6} filter="url(#shadow)" />
-                      <text x={tp.x} y={tp.y - 6} textAnchor="middle" fontSize={11} fontWeight="700" fill={cfg.color} fontFamily="ui-sans-serif,system-ui,sans-serif">{cfg.label}</text>
-                      <text x={tp.x} y={tp.y + 10} textAnchor="middle" fontSize={9.5} fill={cfg.color} fillOpacity={0.7} fontFamily="ui-sans-serif,system-ui,sans-serif">✦ {cnt}</text>
-                    </g>
-                  )
-                })}
-
+                {/* Competitor nodes */}
                 {competitors.map((c, ci) => {
-                  const cp     = cPos.get(c.id)
+                  const cp    = cPos.get(c.id)
                   if (!cp) return null
                   const isHov  = hovered === c.id
                   const isVis  = vis(c)
@@ -555,39 +518,41 @@ export default function MarketMap({ competitors }: Props) {
                   const init   = (c.name[0] ?? '?').toUpperCase()
                   const d      = dot(c.activity_count ?? 0)
 
+                  const dx = cp.x - CX; const dy = cp.y - CY
+                  const dist = Math.sqrt(dx*dx + dy*dy) || 1
+                  const nx = dx/dist; const ny = dy/dist
+                  const lx = nx * (NODE_R + 14); const ly = ny * (NODE_R + 14)
+                  const anchor = Math.abs(nx) > 0.6 ? (nx > 0 ? 'start' : 'end') : 'middle'
+                  const baseline = Math.abs(ny) > 0.6 ? (ny > 0 ? 'hanging' : 'auto') : 'central'
+
                   return (
-                    <g key={c.id} data-interactive="true" transform={`translate(${cp.x} ${cp.y})`} opacity={isVis ? 1 : 0.07}
-                      className="sm-fade" style={{ cursor: isVis ? 'pointer' : 'default', animationDelay: `${100 + ci * 35}ms` }}
-                      onClick={() => isVis && setSelected(c)} onMouseEnter={() => setHovered(c.id)} onMouseLeave={() => setHovered(null)}>
+                    <g key={c.id} data-interactive="true" transform={`translate(${cp.x} ${cp.y})`}
+                      opacity={isVis ? 1 : 0.07} className="sm-fade"
+                      style={{ cursor: isVis ? 'pointer' : 'default', animationDelay: `${100 + ci * 35}ms` }}
+                      onClick={() => isVis && setSelected(c)}
+                      onMouseEnter={() => setHovered(c.id)}
+                      onMouseLeave={() => setHovered(null)}>
                       {isHov && <circle r={NODE_R + 8} fill="#6366f1" fillOpacity={0.1} />}
                       <circle r={NODE_R} fill="white" stroke={isHov ? '#6366f1' : '#e5e7eb'} strokeWidth={isHov ? 2 : 1.5} filter="url(#shadow)" />
                       {logo ? (
-                        <image href={logo} x={-(NODE_R-4)} y={-(NODE_R-4)} width={(NODE_R-4)*2} height={(NODE_R-4)*2} clipPath={`url(#cl-${c.id})`} preserveAspectRatio="xMidYMid meet" onError={() => setImgErrors(p => { const s = new Set(p); s.add(c.id); return s })} />
+                        <image href={logo} x={-(NODE_R-4)} y={-(NODE_R-4)} width={(NODE_R-4)*2} height={(NODE_R-4)*2}
+                          clipPath={`url(#cl-${c.id})`} preserveAspectRatio="xMidYMid meet"
+                          onError={() => setImgErrors(p => { const s = new Set(p); s.add(c.id); return s })} />
                       ) : (
-                        <text textAnchor="middle" dominantBaseline="central" fontSize={12} fontWeight="700" fill="#374151" fontFamily="ui-sans-serif,system-ui,sans-serif">{init}</text>
+                        <text textAnchor="middle" dominantBaseline="central" fontSize={12} fontWeight="700" fill="#374151"
+                          fontFamily="ui-sans-serif,system-ui,sans-serif">{init}</text>
                       )}
                       <circle cx={NODE_R * 0.7} cy={-NODE_R * 0.7} r={6} fill="white" />
                       <circle cx={NODE_R * 0.7} cy={-NODE_R * 0.7} r={4.5} fill={d} />
-                      {(() => {
-                        const tp2 = tPos.get(c.theme)
-                        if (!cp || !tp2) return null
-                        const ax = cp.x - tp2.x; const ay = cp.y - tp2.y
-                        const al = Math.sqrt(ax*ax + ay*ay) || 1
-                        const nx = ax/al; const ny = ay/al
-                        const lx = nx * (NODE_R + 13); const ly = ny * (NODE_R + 13)
-                        const anchor = Math.abs(nx) > 0.6 ? (nx > 0 ? 'start' : 'end') : 'middle'
-                        return <text x={lx} y={ly} textAnchor={anchor} dominantBaseline={Math.abs(ny) > 0.6 ? (ny > 0 ? 'hanging' : 'auto') : 'central'} fontSize={10} fontWeight={isHov ? '700' : '500'} fill={isHov ? '#111827' : '#6b7280'} fontFamily="ui-sans-serif,system-ui,sans-serif">{c.name}</text>
-                      })()}
+                      <text x={lx} y={ly} textAnchor={anchor} dominantBaseline={baseline}
+                        fontSize={10} fontWeight={isHov ? '700' : '500'}
+                        fill={isHov ? '#111827' : '#6b7280'}
+                        fontFamily="ui-sans-serif,system-ui,sans-serif">{c.name}</text>
                     </g>
                   )
                 })}
               </g>
             </svg>
-
-            {/* Theme count badge */}
-            <div className="absolute top-4 right-4 bg-white/90 border border-gray-200 rounded-full px-3 py-1.5 shadow-sm pointer-events-none">
-              <span className="text-gray-500 text-xs font-medium">✦ {themes.length} major themes detected</span>
-            </div>
 
             {/* Zoom + Sync bar */}
             <div className="absolute bottom-4 left-4 flex items-center gap-2">
@@ -614,17 +579,6 @@ export default function MarketMap({ competitors }: Props) {
                   </span>
                 )}
               </div>
-            </div>
-
-            {/* Legend */}
-            <div className="absolute bottom-4 right-4 bg-white border border-gray-200 rounded-xl p-3 shadow-sm">
-              <p className="text-gray-400 text-[9px] font-semibold uppercase tracking-wider mb-2">Activity (7d)</p>
-              {[['#d1d5db','No signals'],['#f97316','1–2 signals'],['#ef4444','3+ signals']].map(([color, label]) => (
-                <div key={label} className="flex items-center gap-2 mb-1 last:mb-0">
-                  <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: color }} />
-                  <span className="text-gray-500 text-xs">{label}</span>
-                </div>
-              ))}
             </div>
           </>
         )}

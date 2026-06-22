@@ -3,7 +3,6 @@
 import { ExternalLink, Swords, User, Zap } from 'lucide-react'
 import Link from 'next/link'
 import type { MockCompetitor } from './mock-data'
-import { THEME_CONFIG } from './mock-data'
 import CompetitorLogo from '@/components/ui/competitor-logo'
 
 function RiskBadge({ score }: { score: number }) {
@@ -31,7 +30,6 @@ export default function CompetitorDrawer({ competitor, open, onClose }: {
 }) {
   if (!competitor || !open) return null
 
-  const theme = THEME_CONFIG[competitor.theme]
   const isReal = isRealId(competitor.id)
   const latestSignal = competitor.last_signal ?? competitor.description ?? null
 
@@ -73,14 +71,8 @@ export default function CompetitorDrawer({ competitor, open, onClose }: {
             </button>
           </div>
 
-          {/* Theme + risk */}
+          {/* Risk */}
           <div className="flex items-center gap-2">
-            <span
-              className="text-[11px] px-2 py-0.5 rounded-full font-medium"
-              style={{ backgroundColor: theme.bg, color: theme.color }}
-            >
-              {competitor.theme}
-            </span>
             <RiskBadge score={competitor.risk_score} />
           </div>
         </div>
