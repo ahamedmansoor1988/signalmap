@@ -63,25 +63,23 @@ export async function fetchBlogRSS(website: string | null | undefined): Promise<
   if (!website) return []
   const base = website.replace(/\/$/, '')
 
-  // If this looks like a direct RSS URL, try it first
   const isDirectRss = /\.(xml|rss|atom)$|\/feed(\/|$)/.test(base)
   const candidates = isDirectRss
     ? [base]
-    : [
-        `${base}/blog/rss.xml`,
-        `${base}/blog/feed.xml`,
-        `${base}/feed.xml`,
-        `${base}/rss.xml`,
-        `${base}/blog/feed`,
-      ]
-  for (const url of candidates) {
-    try {
-      const res = await fetch(url, { signal: AbortSignal.timeout(6000) })
-      if (!res.ok) continue
+    : [`${base}/blog/feed`, `${base}/feed.xml`, `${base}/blog/rss.xml`]
+
+  // Try all candidates in parallel, return first valid result
+  const results = await Promise.allSettled(
+    candidates.map(async (url) => {
+      const res = await fetch(url, {
+        signal: AbortSignal.timeout(4000),
+        headers: { 'User-Agent': UA },
+      })
+      if (!res.ok) throw new Error(`${res.status}`)
       const xml = await res.text()
-      if (!xml.includes('<item')) continue
+      if (!xml.includes('<item')) throw new Error('no items')
       const items = parseItems(xml).filter(i => i.title && i.link)
-      if (!items.length) continue
+      if (!items.length) throw new Error('empty')
       return items.map(i => ({
         title:   i.title,
         link:    i.link,
@@ -89,7 +87,11 @@ export async function fetchBlogRSS(website: string | null | undefined): Promise<
         summary: i.description.replace(/<[^>]+>/g, '').slice(0, 400),
         source:  'blog_rss' as const,
       }))
-    } catch { continue }
+    })
+  )
+
+  for (const r of results) {
+    if (r.status === 'fulfilled') return r.value
   }
   return []
 }

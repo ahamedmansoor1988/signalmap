@@ -49,10 +49,14 @@ export async function POST() {
     competitors.map(async (competitor) => {
       const storedRssUrls = rssUrlsByCompetitor[competitor.id] ?? []
 
+      // If no stored URLs, fall back to guessing common feed paths
+      const rssTargets = storedRssUrls.length > 0
+        ? storedRssUrls
+        : (competitor.website ? [competitor.website] : [])
+
       const [news, ...blogResults] = await Promise.all([
         fetchGoogleNews(competitor.name, competitor.website),
-        // Use stored RSS URLs directly (fast — no guessing)
-        ...storedRssUrls.map(url => fetchBlogRSS(url)),
+        ...rssTargets.map(url => fetchBlogRSS(url)),
       ])
 
       const blogItems = blogResults.flat()
