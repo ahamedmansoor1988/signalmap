@@ -62,13 +62,18 @@ export async function fetchGoogleNews(competitorName: string, website?: string |
 export async function fetchBlogRSS(website: string | null | undefined): Promise<RSSItem[]> {
   if (!website) return []
   const base = website.replace(/\/$/, '')
-  const candidates = [
-    `${base}/blog/rss.xml`,
-    `${base}/blog/feed.xml`,
-    `${base}/feed.xml`,
-    `${base}/rss.xml`,
-    `${base}/blog/feed`,
-  ]
+
+  // If this looks like a direct RSS URL, try it first
+  const isDirectRss = /\.(xml|rss|atom)$|\/feed(\/|$)/.test(base)
+  const candidates = isDirectRss
+    ? [base]
+    : [
+        `${base}/blog/rss.xml`,
+        `${base}/blog/feed.xml`,
+        `${base}/feed.xml`,
+        `${base}/rss.xml`,
+        `${base}/blog/feed`,
+      ]
   for (const url of candidates) {
     try {
       const res = await fetch(url, { signal: AbortSignal.timeout(6000) })
