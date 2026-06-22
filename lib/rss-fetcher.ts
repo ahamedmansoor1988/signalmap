@@ -45,7 +45,8 @@ export async function fetchGoogleNews(competitorName: string): Promise<RSSItem[]
   } catch { return [] }
 }
 
-export async function fetchBlogRSS(website: string): Promise<RSSItem[]> {
+export async function fetchBlogRSS(website: string | null | undefined): Promise<RSSItem[]> {
+  if (!website) return []
   const base = website.replace(/\/$/, '')
   const candidates = [
     `${base}/blog/rss.xml`,

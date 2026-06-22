@@ -207,6 +207,7 @@ export default function InboxClient({
   const [filter, setFilter] = useState<FilterType>('all')
   const [competitorFilter, setCompetitorFilter] = useState<string>('all')
   const [isFetching, startFetchTransition] = useTransition()
+  const [fetchResult, setFetchResult] = useState<string | null>(null)
 
   function handleAssigned(id: string, team: string, email: string) {
     setSignals(prev => prev.map(s => s.id === id ? { ...s, assigned_team: team, assigned_email: email, assigned_at: new Date().toISOString() } : s))
@@ -225,9 +226,21 @@ export default function InboxClient({
   }
 
   function handleFetchSignals() {
+    setFetchResult(null)
     startFetchTransition(async () => {
-      await fetch('/api/signals/fetch', { method: 'POST' })
-      window.location.reload()
+      try {
+        const res = await fetch('/api/signals/fetch', { method: 'POST' })
+        const data = await res.json() as { inserted?: number; error?: string }
+        if (!res.ok || data.error) {
+          setFetchResult(`Error: ${data.error ?? res.statusText}`)
+        } else if (data.inserted === 0) {
+          setFetchResult('No new signals found — all recent news is already in your inbox')
+        } else {
+          window.location.reload()
+        }
+      } catch {
+        setFetchResult('Network error — try again')
+      }
     })
   }
 
@@ -257,14 +270,19 @@ export default function InboxClient({
             {signals.length}
           </span>
         </div>
-        <button
-          onClick={handleFetchSignals}
-          disabled={isFetching}
-          className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg bg-violet-600 text-white hover:bg-violet-700 disabled:opacity-50 transition-colors"
-        >
-          <Rss className="w-3.5 h-3.5" />
-          {isFetching ? 'Fetching…' : 'Fetch Signals'}
-        </button>
+        <div className="flex flex-col items-end gap-1">
+          <button
+            onClick={handleFetchSignals}
+            disabled={isFetching}
+            className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg bg-violet-600 text-white hover:bg-violet-700 disabled:opacity-50 transition-colors"
+          >
+            <Rss className="w-3.5 h-3.5" />
+            {isFetching ? 'Fetching…' : 'Fetch Signals'}
+          </button>
+          {fetchResult && (
+            <p className="text-[10px] text-gray-400 max-w-xs text-right">{fetchResult}</p>
+          )}
+        </div>
       </div>
 
       {/* Filters */}

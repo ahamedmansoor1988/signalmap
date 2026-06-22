@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
-import { fetchGoogleNews, fetchBlogRSS } from '@/lib/rss-fetcher'
+import { fetchGoogleNews } from '@/lib/rss-fetcher'
 import { callClaudeJSON } from '@/lib/ai'
 import { SIGNAL_IMPACT_SYSTEM } from '@/lib/prompts/signals'
 
@@ -29,42 +29,54 @@ export async function POST() {
   const existingUrls = new Set((existing ?? []).map(e => e.url).filter(Boolean) as string[])
 
   const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
-  let totalInserted = 0
 
-  for (const competitor of competitors) {
-    const [news, blog] = await Promise.all([
-      fetchGoogleNews(competitor.name),
-      fetchBlogRSS(competitor.website),
-    ])
+  // Fetch Google News for all competitors in parallel
+  const fetchResults = await Promise.allSettled(
+    competitors.map(async (competitor) => {
+      const news = await fetchGoogleNews(competitor.name)
+      const items = news
+        .filter(i => i.link && !existingUrls.has(i.link))
+        .filter(i => new Date(i.pubDate) >= sevenDaysAgo)
+        .slice(0, 3) // max 3 per competitor to stay within time budget
+      return { competitor, items }
+    })
+  )
 
-    const items = [...news, ...blog]
-      .filter(i => i.link && !existingUrls.has(i.link))
-      .filter(i => new Date(i.pubDate) >= sevenDaysAgo)
-      .slice(0, 6)
-
-    for (const item of items) {
-      try {
-        const ai = await callClaudeJSON<{ impact: string; counter: string }>(
-          SIGNAL_IMPACT_SYSTEM,
-          `Competitor: ${competitor.name}\nHeadline: ${item.title}\nSummary: ${item.summary}`,
-          250
-        )
-        await supabase.from('news_signals').insert({
-          competitor_id: competitor.id,
-          org_id:        membership.org_id,
-          title:         item.title,
-          summary:       item.summary,
-          url:           item.link,
-          source_type:   item.source,
-          published_at:  item.pubDate,
-          ai_impact:     ai.impact,
-          ai_counter:    ai.counter,
-        })
-        existingUrls.add(item.link)
-        totalInserted++
-      } catch { continue }
+  // Flatten all new items
+  type Competitor = typeof competitors[0]
+  type RSSItem = Awaited<ReturnType<typeof fetchGoogleNews>>[0]
+  const toProcess: Array<{ competitor: Competitor; item: RSSItem }> = []
+  for (const r of fetchResults) {
+    if (r.status === 'fulfilled') {
+      for (const item of r.value.items) {
+        toProcess.push({ competitor: r.value.competitor, item })
+      }
     }
   }
 
+  // Run AI + insert in parallel (capped at 10 total to stay fast)
+  const inserts = await Promise.allSettled(
+    toProcess.slice(0, 10).map(async ({ competitor, item }) => {
+      const ai = await callClaudeJSON<{ impact: string; counter: string }>(
+        SIGNAL_IMPACT_SYSTEM,
+        `Competitor: ${competitor.name}\nHeadline: ${item.title}\nSummary: ${item.summary}`,
+        250
+      )
+      await supabase.from('news_signals').insert({
+        competitor_id: competitor.id,
+        org_id:        membership.org_id,
+        title:         item.title,
+        summary:       item.summary,
+        url:           item.link,
+        source_type:   item.source,
+        published_at:  item.pubDate,
+        ai_impact:     ai.impact,
+        ai_counter:    ai.counter,
+      })
+      return item.link
+    })
+  )
+
+  const totalInserted = inserts.filter(r => r.status === 'fulfilled').length
   return NextResponse.json({ inserted: totalInserted })
 }
