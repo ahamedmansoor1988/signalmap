@@ -11,7 +11,7 @@ export default async function OnboardingPage() {
 
   const { data: membership } = await supabase
     .from('org_members')
-    .select('org_id')
+    .select('org_id, organizations!inner(plan)')
     .eq('user_id', user.id)
     .maybeSingle()
 
@@ -46,6 +46,7 @@ export default async function OnboardingPage() {
     .eq('org_id', orgId)
 
   const existingCount = existingCompetitors?.length ?? 0
+  const plan = (membership?.organizations as { plan?: string } | null)?.plan ?? 'starter'
 
-  return <OnboardingClient orgId={orgId} existingCount={existingCount} />
+  return <OnboardingClient orgId={orgId} existingCount={existingCount} plan={plan} />
 }

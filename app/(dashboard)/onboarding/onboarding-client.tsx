@@ -11,10 +11,12 @@ import {
   Globe, Plus, RefreshCw, Building2, Users2, Rocket,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { getPlan } from '@/lib/plans'
 
 interface Props {
   orgId: string
   existingCount: number
+  plan: string
 }
 
 const INDUSTRIES = ['SaaS', 'E-commerce', 'Fintech', 'Healthcare', 'EdTech', 'Marketing', 'Other'] as const
@@ -57,7 +59,7 @@ function StepIndicator({ current }: { current: 1 | 2 | 3 }) {
   )
 }
 
-export default function OnboardingClient({ orgId, existingCount }: Props) {
+export default function OnboardingClient({ orgId, existingCount, plan }: Props) {
   const router = useRouter()
   const supabase = createClient()
 
@@ -136,15 +138,7 @@ export default function OnboardingClient({ orgId, existingCount }: Props) {
     setLoadingMore(true)
     try {
       const more = await fetchSuggestions(suggestions.map(s => s.name))
-      setSuggestions(prev => {
-        const next = [...prev, ...more]
-        setSelected(sel => {
-          const updated = new Set(sel)
-          for (let i = prev.length; i < next.length; i++) updated.add(i)
-          return updated
-        })
-        return next
-      })
+      setSuggestions(prev => [...prev, ...more])
     } catch { /* silently fail */ } finally {
       setLoadingMore(false)
     }
@@ -158,20 +152,24 @@ export default function OnboardingClient({ orgId, existingCount }: Props) {
     }
     setSuggestions(prev => {
       const next = [...prev, custom]
-      setSelected(sel => new Set([...Array.from(sel), next.length - 1]))
+      setSelected(sel => {
+        if (sel.size >= LIMIT) return sel
+        return new Set([...Array.from(sel), next.length - 1])
+      })
       return next
     })
     setCustomName(''); setCustomUrl(''); setShowCustom(false)
   }
 
-  const FREE_LIMIT = 5
+  const planLimit = getPlan(plan).competitors
+  const LIMIT = planLimit === -1 ? Infinity : planLimit
 
   function toggle(i: number) {
     setSelected(prev => {
       const next = new Set(prev)
       if (next.has(i)) {
         next.delete(i)
-      } else if (next.size < FREE_LIMIT) {
+      } else if (next.size < LIMIT) {
         next.add(i)
       }
       return next
@@ -252,10 +250,12 @@ export default function OnboardingClient({ orgId, existingCount }: Props) {
 
           <div className="flex items-center justify-between mb-4">
             <span className="text-gray-500 text-sm">
-              <span className={`font-medium ${selected.size >= FREE_LIMIT ? 'text-violet-600' : 'text-gray-900'}`}>{selected.size}</span>
-              <span className="text-gray-400"> / {FREE_LIMIT} selected</span>
-              {selected.size >= FREE_LIMIT && (
-                <span className="ml-2 text-xs text-violet-600 bg-violet-50 px-2 py-0.5 rounded-full">Free plan limit</span>
+              <span className={`font-medium ${selected.size >= LIMIT ? 'text-violet-600' : 'text-gray-900'}`}>{selected.size}</span>
+              <span className="text-gray-400"> / {LIMIT === Infinity ? '∞' : LIMIT} selected</span>
+              {selected.size >= LIMIT && LIMIT !== Infinity && (
+                <span className="ml-2 text-xs text-violet-600 bg-violet-50 px-2 py-0.5 rounded-full">
+                  {getPlan(plan).name} plan limit — <a href="/pricing" className="underline">upgrade</a>
+                </span>
               )}
             </span>
             <button onClick={() => setSelected(new Set())} className="text-xs text-gray-400 hover:text-gray-600 transition-colors">
@@ -273,7 +273,7 @@ export default function OnboardingClient({ orgId, existingCount }: Props) {
                   className={`text-left rounded-xl border p-4 transition-all relative ${
                     isSelected
                       ? 'border-violet-300 bg-violet-50 shadow-sm'
-                      : selected.size >= FREE_LIMIT
+                      : selected.size >= LIMIT
                         ? 'border-gray-100 bg-gray-50 opacity-50 cursor-not-allowed'
                         : 'border-gray-200 bg-white hover:border-gray-300'
                   }`}
@@ -312,7 +312,7 @@ export default function OnboardingClient({ orgId, existingCount }: Props) {
                   className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-violet-500" />
                 <input value={customUrl} onChange={e => setCustomUrl(e.target.value)} placeholder="website.com"
                   className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-violet-500" />
-                <button onClick={addCustom} disabled={!customName.trim() || !customUrl.trim()}
+                <button onClick={addCustom} disabled={!customName.trim() || !customUrl.trim() || selected.size >= LIMIT}
                   className="px-4 py-2 bg-violet-600 hover:bg-violet-500 disabled:opacity-40 text-white text-sm rounded-lg transition-colors">
                   Add
                 </button>
