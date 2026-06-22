@@ -128,7 +128,7 @@ function SignalCard({ s }: { s: TimelineSignal }) {
   )
 }
 
-export default function SignalTimeline({ competitorId, plan: _plan }: Props) {
+export default function SignalTimeline({ competitorId }: Props) {
   const [data, setData] = useState<TimelineResponse | null>(null)
   const [loading, setLoading] = useState(true)
 

@@ -15,7 +15,7 @@ interface DiscoverResult {
   pages: { url: string; label: string }[]
 }
 
-export default function BackfillButton({ competitorId, plan: _plan }: Props) {
+export default function BackfillButton({ competitorId }: Props) {
   const [state, setState] = useState<State>('idle')
   const [result, setResult] = useState<DiscoverResult | null>(null)
   const [errorMsg, setErrorMsg] = useState('')
