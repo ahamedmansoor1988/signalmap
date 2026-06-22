@@ -54,7 +54,7 @@ export async function GET() {
   if (aiResult && !aiError) {
     const { error } = await supabase.from('news_signals').insert({
       competitor_id: firstCompetitor.id,
-      org_id: membership?.org_id,
+      org_id: membership?.org_id ?? '',
       title: item.title,
       summary: item.summary,
       url: item.link,
