@@ -308,7 +308,7 @@ export default function InboxClient({
           <div className="flex flex-col items-center justify-center py-20 text-center">
             <Inbox className="w-10 h-10 text-gray-200 mb-3" />
             <p className="text-sm font-medium text-gray-400">No signals yet</p>
-            <p className="text-xs text-gray-300 mt-1">Click "Fetch Signals" to pull the latest from your competitors</p>
+            <p className="text-xs text-gray-300 mt-1">Click &quot;Fetch Signals&quot; to pull the latest from your competitors</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
