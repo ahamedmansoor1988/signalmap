@@ -138,7 +138,16 @@ export default function OnboardingClient({ orgId, existingCount, plan }: Props) 
     setLoadingMore(true)
     try {
       const more = await fetchSuggestions(suggestions.map(s => s.name))
-      setSuggestions(prev => [...prev, ...more])
+      setSuggestions(prev => {
+        const seen = new Set(prev.map(s => s.website.replace(/^https?:\/\//, '').replace(/\/$/, '').toLowerCase()))
+        const deduped = more.filter(s => {
+          const key = s.website.replace(/^https?:\/\//, '').replace(/\/$/, '').toLowerCase()
+          if (seen.has(key)) return false
+          seen.add(key)
+          return true
+        })
+        return [...prev, ...deduped]
+      })
     } catch { /* silently fail */ } finally {
       setLoadingMore(false)
     }
@@ -187,7 +196,16 @@ export default function OnboardingClient({ orgId, existingCount, plan }: Props) 
         if (!res.ok) throw new Error('Failed to clear existing competitors')
       }
 
-      for (const c of toAdd) {
+      // Deduplicate by normalized website before inserting
+      const seen = new Set<string>()
+      const unique = toAdd.filter(c => {
+        const key = c.website.replace(/^https?:\/\//, '').replace(/\/$/, '').toLowerCase()
+        if (seen.has(key)) return false
+        seen.add(key)
+        return true
+      })
+
+      for (const c of unique) {
         const { data: comp, error: compErr } = await supabase
           .from('competitors')
           .insert({ org_id: orgId, name: c.name, website: c.website })
