@@ -72,7 +72,8 @@ export default async function MapPage() {
 
       competitors = dbCompetitors.map((c, idx) => {
         type RawChange = { theme: string | null; ai_signal: string | null; detected_at: string; risk_score: number | null }
-        const allChanges = (c.changes as Array<{ changes: RawChange[] }>)
+        const trackedPages = c.changes as Array<{ changes: RawChange[] }>
+        const allChanges = trackedPages
           .flatMap(tp => tp.changes)
           .sort((a, b) => new Date(b.detected_at).getTime() - new Date(a.detected_at).getTime())
 
@@ -90,6 +91,7 @@ export default async function MapPage() {
           theme,
           last_signal: allChanges[0]?.ai_signal ?? 'No signals yet',
           signals_count: allChanges.length,
+          tracked_pages_count: trackedPages.length,
           activity_count: activityCount,
           description: c.ai_summary ?? `Tracking ${c.website}`,
           ai_summary: c.ai_summary ?? undefined,

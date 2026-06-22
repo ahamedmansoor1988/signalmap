@@ -6,6 +6,11 @@ import type { MockCompetitor } from './mock-data'
 import CompetitorLogo from '@/components/ui/competitor-logo'
 
 function RiskBadge({ score }: { score: number }) {
+  if (score === 0) return (
+    <span className="text-xs px-2 py-0.5 rounded-full border font-medium bg-gray-50 text-gray-400 border-gray-200">
+      Monitoring
+    </span>
+  )
   const level = score >= 75 ? 'High' : score >= 50 ? 'Medium' : 'Low'
   const colors = {
     High:   'bg-red-50 text-red-600 border-red-200',

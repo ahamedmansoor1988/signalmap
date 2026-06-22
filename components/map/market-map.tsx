@@ -21,6 +21,7 @@ export interface MapCompetitor {
   theme: Theme
   last_signal: string
   signals_count: number
+  tracked_pages_count?: number
   description: string
   activity_count?: number
   ai_summary?: string
@@ -39,14 +40,9 @@ const H  = 1060
 const CX = W / 2
 const CY = H / 2 + 30
 
-// ── Sizes ──────────────────────────────────────────────────────
-const NODE_R  = 22
-
-const RINGS = [
-  { r: 445, label: 'MONITOR',     fill: '#f8fafc', stroke: '#cbd5e1', textFill: '#94a3b8' },
-  { r: 315, label: 'MEDIUM RISK', fill: '#fffbeb', stroke: '#fde68a', textFill: '#ca8a04' },
-  { r: 185, label: 'HIGH RISK',   fill: '#fff1f2', stroke: '#fecaca', textFill: '#ef4444' },
-]
+// ── Bubble sizing ───────────────────────────────────────────────
+const MIN_R = 54
+const MAX_R = 120
 
 function dot(count: number) {
   if (!count)    return '#d1d5db'
@@ -54,30 +50,56 @@ function dot(count: number) {
   return '#ef4444'
 }
 
-function ringLayout(competitors: MapCompetitor[]) {
-  const high   = competitors.filter(c => c.risk_score >= 75)
-  const medium = competitors.filter(c => c.risk_score >= 45 && c.risk_score < 75)
-  const low    = competitors.filter(c => c.risk_score < 45)
+function bubbleLayout(competitors: MapCompetitor[]) {
+  const N = competitors.length
+  if (N === 0) return new Map<string, { x: number; y: number; r: number }>()
 
-  const cPos = new Map<string, { x: number; y: number }>()
+  type Node = { id: string; r: number; x: number; y: number }
 
-  function place(comps: MapCompetitor[], radius: number) {
-    const N = comps.length
-    if (!N) return
-    comps.forEach((comp, i) => {
-      const angle = -Math.PI / 2 + (i / N) * 2 * Math.PI
-      cPos.set(comp.id, { x: CX + radius * Math.cos(angle), y: CY + radius * Math.sin(angle) })
-    })
+  const nodes: Node[] = competitors.map((c, i) => {
+    const r = MIN_R + (c.risk_score / 100) * (MAX_R - MIN_R)
+    const angle = (i / N) * 2 * Math.PI - Math.PI / 2
+    const initR = N === 1 ? 0 : r * 2.4
+    return { id: c.id, r, x: CX + initR * Math.cos(angle), y: CY + initR * Math.sin(angle) }
+  })
+
+  const vx = new Array(N).fill(0) as number[]
+  const vy = new Array(N).fill(0) as number[]
+
+  for (let t = 0; t < 300; t++) {
+    const g = 0.013
+    for (let i = 0; i < N; i++) {
+      vx[i] += (CX - nodes[i].x) * g
+      vy[i] += (CY - nodes[i].y) * g
+    }
+    for (let i = 0; i < N; i++) {
+      for (let j = i + 1; j < N; j++) {
+        const dx = nodes[j].x - nodes[i].x
+        const dy = nodes[j].y - nodes[i].y
+        const dist = Math.sqrt(dx * dx + dy * dy) || 0.01
+        const minD = nodes[i].r + nodes[j].r + 14
+        if (dist < minD) {
+          const push = (minD - dist) / dist * 0.5
+          vx[i] -= dx * push; vy[i] -= dy * push
+          vx[j] += dx * push; vy[j] += dy * push
+        }
+      }
+    }
+    for (let i = 0; i < N; i++) {
+      vx[i] *= 0.83; vy[i] *= 0.83
+      nodes[i].x += vx[i]; nodes[i].y += vy[i]
+    }
   }
 
-  place(high,   185)
-  place(medium, 315)
-  place(low,    445)
-
-  return cPos
+  return new Map(nodes.map(n => [n.id, { x: n.x, y: n.y, r: n.r }]))
 }
 
 function RiskBadge({ score }: { score: number }) {
+  if (score === 0) return (
+    <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full border text-gray-400 bg-gray-50 border-gray-200">
+      Monitoring
+    </span>
+  )
   const level = score >= 75 ? 'High' : score >= 45 ? 'Medium' : 'Low'
   const cls = { High: 'text-red-600 bg-red-50 border-red-100', Medium: 'text-amber-600 bg-amber-50 border-amber-100', Low: 'text-emerald-600 bg-emerald-50 border-emerald-100' }[level]
   return <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${cls}`}>{level} · {score}</span>
@@ -329,7 +351,7 @@ export default function MarketMap({ competitors }: Props) {
   const dragStart = useRef({ mx: 0, my: 0, px: 0, py: 0 })
   const svgRef    = useRef<SVGSVGElement>(null)
 
-  const cPos = ringLayout(competitors)
+  const bubblePos = bubbleLayout(competitors)
   const q   = search.toLowerCase()
   const vis = (c: MapCompetitor) => !q || c.name.toLowerCase().includes(q) || c.theme.toLowerCase().includes(q)
 
@@ -463,7 +485,7 @@ export default function MarketMap({ competitors }: Props) {
       {/* ── Canvas / Cards / List ── */}
       <div className="flex-1 relative overflow-hidden">
 
-        {/* ── CLUSTER VIEW ── */}
+        {/* ── BUBBLE MAP VIEW ── */}
         {viewMode === 'cluster' && (
           <>
             <svg
@@ -478,76 +500,65 @@ export default function MarketMap({ competitors }: Props) {
               onPointerLeave={onPointerUp}
             >
               <defs>
-                {competitors.map(c => (
-                  <clipPath key={c.id} id={`cl-${c.id}`}>
-                    <circle r={NODE_R - 3} cx={0} cy={0} />
-                  </clipPath>
-                ))}
-                <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
-                  <feDropShadow dx="0" dy="2" stdDeviation="3" floodColor="#0001" />
+                {competitors.map(c => {
+                  const bp = bubblePos.get(c.id)
+                  if (!bp) return null
+                  return (
+                    <clipPath key={c.id} id={`bbl-${c.id}`}>
+                      <circle r={bp.r - 8} cx={0} cy={0} />
+                    </clipPath>
+                  )
+                })}
+                <filter id="shadow" x="-30%" y="-30%" width="160%" height="160%">
+                  <feDropShadow dx="0" dy="4" stdDeviation="6" floodColor="#00000014" />
                 </filter>
               </defs>
 
               <g transform={`translate(${pan.x + W/2 * (1 - zoom)} ${pan.y + H/2 * (1 - zoom)}) scale(${zoom})`}>
-
-                {/* Concentric risk rings — outermost first so inner fills on top */}
-                {RINGS.map(ring => (
-                  <g key={ring.label}>
-                    <circle cx={CX} cy={CY} r={ring.r} fill={ring.fill} stroke={ring.stroke} strokeWidth={1.5} />
-                    <text x={CX} y={CY - ring.r + 18} textAnchor="middle" fontSize={10} fontWeight="600"
-                      fill={ring.textFill} letterSpacing="0.1em" fontFamily="ui-sans-serif,system-ui,sans-serif">
-                      {ring.label}
-                    </text>
-                  </g>
-                ))}
-
-                {/* Center "YOU" node */}
-                <circle cx={CX} cy={CY} r={44} fill="#1e1b4b" filter="url(#shadow)" />
-                <text x={CX} y={CY} textAnchor="middle" dominantBaseline="central"
-                  fontSize={11} fontWeight="700" fill="white" letterSpacing="0.06em"
-                  fontFamily="ui-sans-serif,system-ui,sans-serif">YOU</text>
-
-                {/* Competitor nodes */}
                 {competitors.map((c, ci) => {
-                  const cp    = cPos.get(c.id)
-                  if (!cp) return null
+                  const bp    = bubblePos.get(c.id)
+                  if (!bp) return null
+                  const { x, y, r } = bp
                   const isHov  = hovered === c.id
                   const isVis  = vis(c)
                   const hasErr = imgErrors.has(c.id)
                   const logo   = hasErr ? null : getLogoUrl(c.website)
                   const init   = (c.name[0] ?? '?').toUpperCase()
                   const d      = dot(c.activity_count ?? 0)
-
-                  const dx = cp.x - CX; const dy = cp.y - CY
-                  const dist = Math.sqrt(dx*dx + dy*dy) || 1
-                  const nx = dx/dist; const ny = dy/dist
-                  const lx = nx * (NODE_R + 14); const ly = ny * (NODE_R + 14)
-                  const anchor = Math.abs(nx) > 0.6 ? (nx > 0 ? 'start' : 'end') : 'middle'
-                  const baseline = Math.abs(ny) > 0.6 ? (ny > 0 ? 'hanging' : 'auto') : 'central'
+                  const riskStroke = c.risk_score >= 75 ? '#fca5a5' : c.risk_score >= 45 ? '#fde68a' : '#e2e8f0'
 
                   return (
-                    <g key={c.id} data-interactive="true" transform={`translate(${cp.x} ${cp.y})`}
+                    <g key={c.id} data-interactive="true" transform={`translate(${x} ${y})`}
                       opacity={isVis ? 1 : 0.07} className="sm-fade"
-                      style={{ cursor: isVis ? 'pointer' : 'default', animationDelay: `${100 + ci * 35}ms` }}
+                      style={{ cursor: isVis ? 'pointer' : 'default', animationDelay: `${ci * 55}ms` }}
                       onClick={() => isVis && setSelected(c)}
                       onMouseEnter={() => setHovered(c.id)}
                       onMouseLeave={() => setHovered(null)}>
-                      {isHov && <circle r={NODE_R + 8} fill="#6366f1" fillOpacity={0.1} />}
-                      <circle r={NODE_R} fill="white" stroke={isHov ? '#6366f1' : '#e5e7eb'} strokeWidth={isHov ? 2 : 1.5} filter="url(#shadow)" />
+                      {isHov && <circle r={r + 12} fill="#6366f1" fillOpacity={0.07} />}
+                      <circle r={r} fill="white" stroke={isHov ? '#6366f1' : riskStroke}
+                        strokeWidth={isHov ? 3 : 2.5} filter="url(#shadow)" />
                       {logo ? (
-                        <image href={logo} x={-(NODE_R-4)} y={-(NODE_R-4)} width={(NODE_R-4)*2} height={(NODE_R-4)*2}
-                          clipPath={`url(#cl-${c.id})`} preserveAspectRatio="xMidYMid meet"
+                        <image href={logo} x={-(r - 12)} y={-(r - 12)} width={(r - 12) * 2} height={(r - 12) * 2}
+                          clipPath={`url(#bbl-${c.id})`} preserveAspectRatio="xMidYMid meet"
                           onError={() => setImgErrors(p => { const s = new Set(p); s.add(c.id); return s })} />
                       ) : (
-                        <text textAnchor="middle" dominantBaseline="central" fontSize={12} fontWeight="700" fill="#374151"
+                        <text textAnchor="middle" dominantBaseline="central"
+                          fontSize={r * 0.44} fontWeight="700" fill="#374151"
                           fontFamily="ui-sans-serif,system-ui,sans-serif">{init}</text>
                       )}
-                      <circle cx={NODE_R * 0.7} cy={-NODE_R * 0.7} r={6} fill="white" />
-                      <circle cx={NODE_R * 0.7} cy={-NODE_R * 0.7} r={4.5} fill={d} />
-                      <text x={lx} y={ly} textAnchor={anchor} dominantBaseline={baseline}
-                        fontSize={10} fontWeight={isHov ? '700' : '500'}
-                        fill={isHov ? '#111827' : '#6b7280'}
+                      {/* Activity dot */}
+                      <circle cx={r * 0.72} cy={-r * 0.72} r={7} fill="white" />
+                      <circle cx={r * 0.72} cy={-r * 0.72} r={5} fill={d} />
+                      {/* Name */}
+                      <text x={0} y={r + 18} textAnchor="middle" fontSize={12}
+                        fontWeight={isHov ? '700' : '600'} fill={isHov ? '#111827' : '#374151'}
                         fontFamily="ui-sans-serif,system-ui,sans-serif">{c.name}</text>
+                      {/* Risk label — only when meaningful */}
+                      {c.risk_score > 0 && (
+                        <text x={0} y={r + 33} textAnchor="middle" fontSize={10} fontWeight="500"
+                          fill={c.risk_score >= 75 ? '#ef4444' : c.risk_score >= 45 ? '#f59e0b' : '#94a3b8'}
+                          fontFamily="ui-sans-serif,system-ui,sans-serif">Risk · {c.risk_score}</text>
+                      )}
                     </g>
                   )
                 })}
@@ -580,6 +591,11 @@ export default function MarketMap({ competitors }: Props) {
                 )}
               </div>
             </div>
+            {/* Bubble size legend */}
+            <div className="absolute top-4 right-4 bg-white/90 border border-gray-200 rounded-xl px-3 py-2.5 shadow-sm pointer-events-none">
+              <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1.5">Bubble size = risk level</p>
+              <p className="text-[10px] text-gray-400">Grows as signals are detected</p>
+            </div>
           </>
         )}
 
@@ -588,7 +604,11 @@ export default function MarketMap({ competitors }: Props) {
           <div className="h-full overflow-y-auto p-6">
             <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
               {filtered.map(c => {
-                const cfg = THEME_CONFIG[c.theme]
+                const signalLabel = c.signals_count > 0
+                  ? `${c.signals_count} signal${c.signals_count !== 1 ? 's' : ''}`
+                  : c.tracked_pages_count
+                    ? `${c.tracked_pages_count} page${c.tracked_pages_count !== 1 ? 's' : ''} tracked`
+                    : 'Monitoring…'
                 return (
                   <div key={c.id}
                     onClick={() => setSelected(c)}
@@ -600,9 +620,8 @@ export default function MarketMap({ competitors }: Props) {
                     </div>
                     <p className="text-gray-900 font-semibold text-sm mb-1">{c.name}</p>
                     <p className="text-gray-400 text-xs mb-3">{c.website.replace(/^https?:\/\//, '')}</p>
-                    <div className="flex items-center justify-between">
-                      <span className="text-[10px] px-2 py-0.5 rounded-full font-medium" style={{ backgroundColor: cfg.bg, color: cfg.color }}>{c.theme}</span>
-                      <span className="text-[10px] text-gray-400">{c.signals_count} signals</span>
+                    <div className="flex items-center justify-end">
+                      <span className="text-[10px] text-gray-400">{signalLabel}</span>
                     </div>
                     {c.last_signal && c.last_signal !== 'No signals yet' && (
                       <p className="text-gray-500 text-[11px] mt-2.5 pt-2.5 border-t border-gray-50 line-clamp-2 leading-snug">{c.last_signal}</p>
