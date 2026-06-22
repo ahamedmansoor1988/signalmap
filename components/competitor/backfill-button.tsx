@@ -1,9 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import Link from 'next/link'
-import { CheckCircle, History, Loader2, Lock } from 'lucide-react'
-import { isPaid } from '@/lib/plans'
+import { CheckCircle, Loader2, Search } from 'lucide-react'
 
 interface Props {
   competitorId: string
@@ -12,91 +10,53 @@ interface Props {
 
 type State = 'idle' | 'loading' | 'done' | 'error'
 
-interface BackfillResult {
-  total_pages: number
-  page_index: number
-  done: boolean
-  changes_inserted: number
+interface DiscoverResult {
+  discovered: number
+  pages: { url: string; label: string }[]
 }
 
-const MAX_PAGES = 10
-
-export default function BackfillButton({ competitorId, plan }: Props) {
+export default function BackfillButton({ competitorId, plan: _plan }: Props) {
   const [state, setState] = useState<State>('idle')
-  const [inserted, setInserted] = useState(0)
+  const [result, setResult] = useState<DiscoverResult | null>(null)
   const [errorMsg, setErrorMsg] = useState('')
-  const [progress, setProgress] = useState<{ current: number; total: number } | null>(null)
-
-  if (!isPaid(plan)) {
-    return (
-      <Link
-        href="/settings"
-        className="flex items-center justify-center gap-1.5 w-full text-xs font-semibold px-3 py-2.5 rounded-lg border border-gray-200 text-gray-400 hover:border-violet-200 hover:text-violet-500 transition-colors"
-      >
-        <Lock className="w-3.5 h-3.5" />
-        Backfill History
-      </Link>
-    )
-  }
 
   async function handleClick() {
     if (state === 'loading') return
     setState('loading')
     setErrorMsg('')
-    setProgress(null)
-
-    let totalInserted = 0
+    setResult(null)
 
     try {
-      for (let pageIndex = 0; pageIndex < MAX_PAGES; pageIndex++) {
-        const res = await fetch(
-          `/api/competitor/${competitorId}/backfill?page_index=${pageIndex}`,
-          { method: 'POST' }
-        )
-
-        if (!res.ok) {
-          const body = await res.text()
-          throw new Error(`Server error ${res.status}: ${body.slice(0, 120)}`)
-        }
-
-        const data = (await res.json()) as BackfillResult
-        totalInserted += data.changes_inserted
-
-        const total = data.total_pages > 0 ? data.total_pages : 1
-        setProgress({ current: Math.min(pageIndex + 1, total), total })
-
-        if (data.done || data.total_pages === 0 || pageIndex >= data.total_pages - 1) break
+      const res = await fetch(`/api/competitor/${competitorId}/discover`, { method: 'POST' })
+      if (!res.ok) {
+        const body = await res.text()
+        throw new Error(`Server error ${res.status}: ${body.slice(0, 120)}`)
       }
-
-      setInserted(totalInserted)
+      const data = (await res.json()) as DiscoverResult
+      setResult(data)
       setState('done')
-      if (totalInserted > 0) {
-        setTimeout(() => window.location.reload(), 1500)
-      }
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : 'Unexpected error — try again')
       setState('error')
     }
   }
 
-  if (state === 'done') {
+  if (state === 'done' && result) {
+    const labels = Array.from(new Set(result.pages.map(p => p.label)))
     return (
       <div className="text-center space-y-1">
         <div className="flex items-center justify-center gap-1.5 text-xs font-semibold text-emerald-600">
           <CheckCircle className="w-3.5 h-3.5" />
-          {inserted > 0 ? `${inserted} signal${inserted !== 1 ? 's' : ''} added` : 'Already up to date'}
+          {result.discovered > 0
+            ? `Found ${result.discovered} new source${result.discovered !== 1 ? 's' : ''}: ${labels.join(', ')}`
+            : 'No new sources found — pages already tracked'}
         </div>
-        {inserted > 0 && (
-          <p className="text-[10px] text-gray-400">Reloading…</p>
-        )}
-        {inserted === 0 && (
-          <button
-            onClick={() => setState('idle')}
-            className="text-[10px] text-gray-400 hover:text-gray-600 underline"
-          >
-            Run again
-          </button>
-        )}
+        <button
+          onClick={() => setState('idle')}
+          className="text-[10px] text-gray-400 hover:text-gray-600 underline"
+        >
+          Run again
+        </button>
       </div>
     )
   }
@@ -111,28 +71,10 @@ export default function BackfillButton({ competitorId, plan }: Props) {
         {state === 'loading' ? (
           <Loader2 className="w-3.5 h-3.5 animate-spin" />
         ) : (
-          <History className="w-3.5 h-3.5" />
+          <Search className="w-3.5 h-3.5" />
         )}
-        {state === 'loading'
-          ? progress && progress.total > 0
-            ? `Page ${progress.current} / ${progress.total}…`
-            : 'Starting…'
-          : 'Backfill 30d History'}
+        {state === 'loading' ? 'Scanning content sources…' : 'Discover Content Sources'}
       </button>
-
-      {state === 'loading' && progress && progress.total > 0 && (
-        <div className="mt-1.5">
-          <div className="w-full bg-gray-100 rounded-full h-1">
-            <div
-              className="bg-violet-500 h-1 rounded-full transition-all duration-300"
-              style={{ width: `${(progress.current / progress.total) * 100}%` }}
-            />
-          </div>
-          <p className="text-[10px] text-gray-400 mt-1 text-center">
-            Checking Wayback Machine snapshots…
-          </p>
-        </div>
-      )}
 
       {state === 'error' && (
         <p className="text-[10px] text-red-500 leading-snug mt-1.5 text-center">

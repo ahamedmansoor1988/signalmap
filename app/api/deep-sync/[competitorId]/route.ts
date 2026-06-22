@@ -7,6 +7,7 @@ import { fetchCompetitorNews } from '@/lib/news'
 import { extractBrandProfile } from '@/lib/brand-extractor'
 import { discoverStrategicPages } from '@/lib/sitemap'
 import { extractStructured, diffStructured } from '@/lib/structured-extractor'
+import { parseRSSFeed, isFeedUrl } from '@/lib/rss-parser'
 import type { PageStructure } from '@/lib/structured-extractor'
 
 export const runtime = 'nodejs'
@@ -31,6 +32,11 @@ Respond with JSON only:
     "Market signal this reveals"
   ]
 }`
+
+const RSS_SIGNAL_PROMPT = `You are a senior competitive intelligence analyst for a PMM.
+Analyze this blog post or changelog entry from a competitor and extract the strategic signal.
+Focus on: new features, product changes, pricing updates, positioning shifts, partnerships, hiring signals.
+Respond with JSON: { "summary": "...", "signal": "...", "confidence": 0-100, "risk_score": 0-100, "theme": "AI Features|Pricing|Enterprise|GTM|Content", "impact_bullets": ["..."] }`
 
 interface NewsSignalResult {
   summary: string; signal: string; confidence: number; risk_score: number
@@ -247,6 +253,49 @@ export async function POST(_req: NextRequest, { params }: { params: { competitor
     } catch (err) {
       results.push({ url: page.url, label: page.label ?? '', status: `error: ${String(err).slice(0, 60)}` })
     }
+  }
+
+  // ── Step 4b: RSS/Atom feed parsing for feed-type tracked pages ──
+  const feedPages = (currentPages ?? []).filter(p => isFeedUrl(p.url))
+  const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+  let rssInserted = 0
+
+  for (const feedPage of feedPages) {
+    try {
+      const items = await parseRSSFeed(feedPage.url)
+      const recentItems = items.filter(item => new Date(item.pubDate) >= sevenDaysAgo)
+
+      for (const item of recentItems) {
+        const { data: existing } = await supabase
+          .from('changes')
+          .select('id')
+          .eq('tracked_page_id', feedPage.id)
+          .eq('diff_html', item.link)
+          .maybeSingle()
+        if (existing) continue
+
+        const prompt = `Competitor: ${competitor.name}\nSource: ${feedPage.label ?? 'Blog'}\nPublished: ${item.pubDate}\nTitle: ${item.title}\n${item.summary ? `Summary: ${item.summary}` : ''}`
+        const ai = await callClaudeJSON<NewsSignalResult>(RSS_SIGNAL_PROMPT, prompt, 600)
+        if (ai.confidence < 20) continue
+
+        await supabase.from('changes').insert({
+          tracked_page_id: feedPage.id,
+          diff_html: item.link,
+          ai_summary: ai.summary,
+          ai_signal: ai.signal,
+          confidence: ai.confidence,
+          risk_score: ai.risk_score,
+          theme: ai.theme,
+          impact_bullets: ai.impact_bullets,
+          detected_at: item.pubDate,
+        })
+        if (ai.risk_score > highestRisk) highestRisk = ai.risk_score
+        rssInserted++
+      }
+    } catch { /* non-fatal per feed */ }
+  }
+  if (feedPages.length > 0) {
+    results.push({ label: 'RSS', status: `${rssInserted} signals from ${feedPages.length} feed${feedPages.length !== 1 ? 's' : ''}` })
   }
 
   // ── Step 5: Per-article news signals with correct dates ──

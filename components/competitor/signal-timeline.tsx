@@ -1,8 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Lock, Zap, Loader2, ChevronDown, ChevronUp, ArrowRight, TrendingUp } from 'lucide-react'
-import { TIME_PERIODS } from '@/lib/plans'
+import { Zap, Loader2, ChevronDown, ChevronUp, ArrowRight, TrendingUp } from 'lucide-react'
 import { THEME_CONFIG, type Theme } from '@/components/map/mock-data'
 import type { TimelineResponse, TimelineSignal } from '@/app/api/competitor/[id]/timeline/route'
 
@@ -40,19 +39,15 @@ function SignalCard({ s }: { s: TimelineSignal }) {
 
   return (
     <div className="border border-gray-100 rounded-xl overflow-hidden">
-      {/* Signal header */}
       <div
         className={`flex items-start gap-3 p-4 ${hasDetail ? 'cursor-pointer hover:bg-gray-50' : ''} transition-colors`}
         onClick={() => hasDetail && setExpanded(e => !e)}
       >
-        {/* Risk dot */}
         <div className={`w-2.5 h-2.5 rounded-full mt-1 shrink-0 ${riskColor}`} />
 
         <div className="flex-1 min-w-0">
-          {/* Headline */}
           <p className="text-sm font-semibold text-gray-800 leading-snug">{s.ai_signal ?? 'Change detected'}</p>
 
-          {/* Meta row */}
           <div className="flex items-center flex-wrap gap-1.5 mt-1.5">
             {s.page_label && (
               <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${labelStyle.bg} ${labelStyle.text}`}>
@@ -87,15 +82,12 @@ function SignalCard({ s }: { s: TimelineSignal }) {
         </div>
       </div>
 
-      {/* Expanded detail */}
       {expanded && hasDetail && (
         <div className="border-t border-gray-100 bg-gray-50 px-4 py-3 space-y-3">
-          {/* Full summary */}
           {s.ai_summary && s.ai_summary !== s.ai_signal && (
             <p className="text-xs text-gray-600 leading-relaxed">{s.ai_summary}</p>
           )}
 
-          {/* Impact bullets */}
           {s.impact_bullets.length > 0 && (
             <div>
               <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-1.5">What this means</p>
@@ -110,7 +102,6 @@ function SignalCard({ s }: { s: TimelineSignal }) {
             </div>
           )}
 
-          {/* Suggested actions */}
           {s.suggested_actions.length > 0 && (
             <div>
               <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-1.5">Recommended actions</p>
@@ -125,7 +116,6 @@ function SignalCard({ s }: { s: TimelineSignal }) {
             </div>
           )}
 
-          {/* Source link */}
           {s.page_url && (
             <a href={s.page_url} target="_blank" rel="noopener noreferrer"
               className="inline-flex items-center gap-1 text-[10px] text-gray-400 hover:text-violet-600 transition-colors">
@@ -138,29 +128,18 @@ function SignalCard({ s }: { s: TimelineSignal }) {
   )
 }
 
-export default function SignalTimeline({ competitorId, plan }: Props) {
-  const [days, setDays] = useState(7)
+export default function SignalTimeline({ competitorId, plan: _plan }: Props) {
   const [data, setData] = useState<TimelineResponse | null>(null)
   const [loading, setLoading] = useState(true)
-  const [showUpgrade, setShowUpgrade] = useState(false)
-
-  const paid = plan === 'pro' || plan === 'business' || plan === 'elite'
 
   useEffect(() => {
     setLoading(true)
-    fetch(`/api/competitor/${competitorId}/timeline?days=${days}`)
+    fetch(`/api/competitor/${competitorId}/timeline?days=7`)
       .then(r => r.json())
       .then(d => { setData(d as TimelineResponse); setLoading(false) })
       .catch(() => setLoading(false))
-  }, [competitorId, days])
+  }, [competitorId])
 
-  function selectPeriod(d: number, requiresPaid: boolean) {
-    if (requiresPaid && !paid) { setShowUpgrade(true); return }
-    setShowUpgrade(false)
-    setDays(d)
-  }
-
-  // Group signals by page label
   const grouped = data?.signals.reduce<Record<string, TimelineSignal[]>>((acc, s) => {
     const key = s.page_label ?? 'Other'
     if (!acc[key]) acc[key] = []
@@ -176,7 +155,6 @@ export default function SignalTimeline({ competitorId, plan }: Props) {
 
   return (
     <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-      {/* Header */}
       <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
         <div className="flex items-center gap-2">
           <Zap className="w-4 h-4 text-violet-500" />
@@ -185,43 +163,8 @@ export default function SignalTimeline({ competitorId, plan }: Props) {
             <span className="text-xs text-gray-400">· {data.signals.length} signals</span>
           )}
         </div>
-        <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-0.5">
-          {TIME_PERIODS.map(p => {
-            const locked = p.paid && !paid
-            const active = days === p.days && !locked
-            return (
-              <button
-                key={p.days}
-                onClick={() => selectPeriod(p.days, p.paid)}
-                className={`relative flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-md transition-colors ${
-                  active ? 'bg-white text-violet-700 shadow-sm' :
-                  locked ? 'text-gray-400 cursor-pointer hover:text-gray-600' :
-                  'text-gray-500 hover:text-gray-700'
-                }`}
-              >
-                {locked && <Lock className="w-2.5 h-2.5" />}
-                {p.label}
-              </button>
-            )
-          })}
-        </div>
+        <span className="text-xs font-medium text-gray-400 bg-gray-100 px-2.5 py-1 rounded-lg">7d</span>
       </div>
-
-      {/* Upgrade prompt */}
-      {showUpgrade && (
-        <div className="mx-5 mt-4 bg-violet-50 border border-violet-100 rounded-xl p-4 flex items-start gap-3">
-          <Lock className="w-4 h-4 text-violet-500 shrink-0 mt-0.5" />
-          <div className="flex-1">
-            <p className="text-sm font-semibold text-violet-800">Unlock 15 &amp; 30-day history</p>
-            <p className="text-xs text-violet-600 mt-0.5">Available on Pro, Business and Elite plans.</p>
-            <a href="mailto:ahamedmansoor1988@gmail.com?subject=SignalMap upgrade"
-              className="inline-flex items-center gap-1 mt-2 text-xs font-semibold text-violet-700 hover:text-violet-900">
-              Upgrade now →
-            </a>
-          </div>
-          <button onClick={() => setShowUpgrade(false)} className="text-violet-400 hover:text-violet-600 text-sm">✕</button>
-        </div>
-      )}
 
       <div className="px-5 py-4">
         {loading && (
@@ -232,14 +175,13 @@ export default function SignalTimeline({ competitorId, plan }: Props) {
 
         {!loading && data && data.signals.length === 0 && (
           <div className="text-center py-12">
-            <p className="text-sm text-gray-400">No signals in the last {days} days</p>
+            <p className="text-sm text-gray-400">No signals in the last 7 days</p>
             <p className="text-xs text-gray-300 mt-1">Run Deep Sync to crawl this competitor&apos;s pages</p>
           </div>
         )}
 
         {!loading && data && data.signals.length > 0 && (
           <div className="space-y-5">
-            {/* Direction bar */}
             {data.direction && (
               <div className="flex items-center gap-2 bg-violet-50 border border-violet-100 rounded-xl px-4 py-2.5">
                 <TrendingUp className="w-3.5 h-3.5 text-violet-500 shrink-0" />
@@ -247,7 +189,6 @@ export default function SignalTimeline({ competitorId, plan }: Props) {
               </div>
             )}
 
-            {/* Risk trend chart */}
             {data.risk_trend.length > 1 && (
               <div>
                 <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-2">Risk over time</p>
@@ -271,7 +212,6 @@ export default function SignalTimeline({ competitorId, plan }: Props) {
               </div>
             )}
 
-            {/* Grouped signals */}
             {sortedGroups.map(([group, sigs]) => {
               const style = pageLabelStyle(group)
               return (

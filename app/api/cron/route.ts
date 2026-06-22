@@ -12,6 +12,7 @@ import { generateTypedActions } from '@/lib/personalized-actions'
 import { fetchCompetitorNews } from '@/lib/news'
 import { discoverStrategicPages } from '@/lib/sitemap'
 import { extractBrandProfile } from '@/lib/brand-extractor'
+import { parseRSSFeed, isFeedUrl } from '@/lib/rss-parser'
 import type { Database } from '@/lib/supabase/types'
 
 interface NewsSignalResult {
@@ -22,6 +23,11 @@ interface NewsSignalResult {
 const NEWS_SIGNAL_PROMPT = `You are a senior competitive intelligence analyst for a PMM.
 Analyze this news article about a competitor and extract the strategic signal.
 Focus on: acquisitions, funding, partnerships, product launches, executive moves, market expansion, pricing changes.
+Respond with JSON: { "summary": "...", "signal": "...", "confidence": 0-100, "risk_score": 0-100, "theme": "AI Features|Pricing|Enterprise|GTM|Content", "impact_bullets": ["..."] }`
+
+const RSS_SIGNAL_PROMPT = `You are a senior competitive intelligence analyst for a PMM.
+Analyze this blog post or changelog entry from a competitor and extract the strategic signal.
+Focus on: new features, product changes, pricing updates, positioning shifts, partnerships, hiring signals.
 Respond with JSON: { "summary": "...", "signal": "...", "confidence": 0-100, "risk_score": 0-100, "theme": "AI Features|Pricing|Enterprise|GTM|Content", "impact_bullets": ["..."] }`
 
 export const runtime = 'nodejs'
@@ -52,7 +58,7 @@ export async function GET(req: NextRequest) {
   // (URL-pattern-based intervals can't be expressed as a single WHERE clause)
   const { data: allPages } = await supabase
     .from('tracked_pages')
-    .select('id, url, competitor_id, last_crawled_at')
+    .select('id, url, competitor_id, last_crawled_at, label')
     .order('last_crawled_at', { ascending: true, nullsFirst: true })
 
   if (!allPages?.length) {
@@ -99,6 +105,51 @@ export async function GET(req: NextRequest) {
   for (const page of pages) {
     await sleep(2000) // 2s between pages to stay under Groq 12k TPM limit
     const tier = getCrawlTier(page.url)
+
+    // RSS/Atom feed — parse instead of crawl
+    if (isFeedUrl(page.url)) {
+      try {
+        const items = await parseRSSFeed(page.url)
+        const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+        const recentItems = items.filter(item => new Date(item.pubDate) >= sevenDaysAgo)
+        let inserted = 0
+
+        for (const item of recentItems) {
+          const { data: existing } = await supabase
+            .from('changes')
+            .select('id')
+            .eq('tracked_page_id', page.id)
+            .eq('diff_html', item.link)
+            .maybeSingle()
+          if (existing) continue
+
+          const compName = competitorMap[page.competitor_id]?.name ?? 'Competitor'
+          const prompt = `Competitor: ${compName}\nSource: ${page.label ?? 'Blog'}\nPublished: ${item.pubDate}\nTitle: ${item.title}\n${item.summary ? `Summary: ${item.summary}` : ''}`
+          const ai = await callClaudeJSON<SummarizeResult>(RSS_SIGNAL_PROMPT, prompt, 600)
+          if (ai.confidence < 20) continue
+
+          await supabase.from('changes').insert({
+            tracked_page_id: page.id,
+            diff_html: item.link,
+            ai_summary: ai.summary,
+            ai_signal: ai.signal,
+            confidence: ai.confidence,
+            risk_score: ai.risk_score,
+            theme: ai.theme,
+            impact_bullets: ai.impact_bullets,
+            detected_at: item.pubDate,
+          })
+          inserted++
+        }
+
+        await supabase.from('tracked_pages').update({ last_crawled_at: new Date().toISOString() }).eq('id', page.id)
+        results.push({ page_id: page.id, url: page.url, tier, status: `rss:${inserted}_inserted/${recentItems.length}_recent` })
+      } catch (err) {
+        results.push({ page_id: page.id, url: page.url, tier, status: `rss_error: ${String(err).slice(0, 60)}` })
+      }
+      continue
+    }
+
     try {
       const crawled = await crawlPage(page.url)
 
