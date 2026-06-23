@@ -673,6 +673,7 @@ export default function MarketMap({ competitors }: Props) {
       )}
 
       <CompetitorDrawer
+        key={selected?.id ?? 'none'}
         competitor={selected}
         onClose={() => setSelected(null)}
         onSynced={(lastSyncedAt) => {

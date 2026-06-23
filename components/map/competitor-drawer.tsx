@@ -59,16 +59,6 @@ export default function CompetitorDrawer({
   const [syncResult, setSyncResult] = useState<SyncResult | null>(null)
   const [syncError, setSyncError]   = useState<string | null>(null)
 
-  // Reset sync state when competitor changes
-  const [prevId, setPrevId] = useState<string | null>(null)
-  if (competitor?.id !== prevId) {
-    setPrevId(competitor?.id ?? null)
-    setSyncState('idle')
-    setSyncResult(null)
-    setSyncError(null)
-    setLogoErr(false)
-  }
-
   if (!competitor) return null
 
   const isRealCompetitor = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(competitor.id)
