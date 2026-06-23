@@ -71,7 +71,7 @@ export default async function MapPage() {
 
       const { data: trackedPages } = await supabase
         .from('tracked_pages')
-        .select('id, competitor_id')
+        .select('id, competitor_id, last_crawled_at')
         .in('competitor_id', competitorIds)
 
       const pageIds = (trackedPages ?? []).map(p => p.id)
@@ -89,7 +89,7 @@ export default async function MapPage() {
         allOrgChanges = (changesData ?? []) as RawChange[]
       }
 
-      // Build a map: competitor_id → changes
+      // Build a map: competitor_id → changes + last synced
       const pageToCompetitor = Object.fromEntries((trackedPages ?? []).map(p => [p.id, p.competitor_id]))
       const changesByCompetitor: Record<string, RawChange[]> = {}
       for (const ch of allOrgChanges) {
@@ -97,6 +97,16 @@ export default async function MapPage() {
         if (!cid) continue
         if (!changesByCompetitor[cid]) changesByCompetitor[cid] = []
         changesByCompetitor[cid].push(ch)
+      }
+
+      // Compute last synced per competitor from tracked_pages.last_crawled_at
+      const lastSyncedByCompetitor: Record<string, string> = {}
+      for (const p of (trackedPages ?? [])) {
+        if (!p.last_crawled_at) continue
+        const cid = p.competitor_id
+        if (!lastSyncedByCompetitor[cid] || p.last_crawled_at > lastSyncedByCompetitor[cid]) {
+          lastSyncedByCompetitor[cid] = p.last_crawled_at
+        }
       }
 
       const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
@@ -119,6 +129,7 @@ export default async function MapPage() {
           description: c.ai_summary ?? `Tracking ${c.website}`,
           ai_summary: c.ai_summary ?? undefined,
           suggested_actions: normalizeActions(c.suggested_actions as Json) || undefined,
+          last_synced_at: lastSyncedByCompetitor[c.id] ?? undefined,
         }
       })
     }

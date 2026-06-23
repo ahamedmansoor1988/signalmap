@@ -10,6 +10,7 @@ import type { TypedAction } from '@/lib/typed-actions'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
 import type { SearchResult } from '@/app/api/search/route'
+import CompetitorDrawer from './competitor-drawer'
 
 export interface MapCompetitor {
   id: string
@@ -24,6 +25,7 @@ export interface MapCompetitor {
   activity_count?: number
   ai_summary?: string
   suggested_actions?: TypedAction[]
+  last_synced_at?: string
 }
 
 interface Props {
@@ -287,6 +289,7 @@ function AddCompetitorModal({ onClose, onAdded }: { onClose: () => void; onAdded
 // ── Main Component ──────────────────────────────────────────────
 export default function MarketMap({ competitors }: Props) {
   const [hovered,     setHovered]     = useState<string | null>(null)
+  const [selected,    setSelected]    = useState<MapCompetitor | null>(null)
   const [search,      setSearch]      = useState('')
   const [imgErrors,   setImgErrors]   = useState<Set<string>>(new Set())
   const [syncing,     setSyncing]     = useState(false)
@@ -528,7 +531,7 @@ export default function MarketMap({ competitors }: Props) {
                     <g key={c.id} data-interactive="true" transform={`translate(${x} ${y})`}
                       opacity={isVis ? 1 : 0.07} className="sm-fade"
                       style={{ cursor: isVis ? 'pointer' : 'default', animationDelay: `${ci * 55}ms` }}
-                      onClick={() => { /* no-op */ }}
+                      onClick={() => { if (isVis) setSelected(c) }}
                       onMouseEnter={() => setHovered(c.id)}
                       onMouseLeave={() => setHovered(null)}>
                       {isHov && <circle r={r + 12} fill="#6366f1" fillOpacity={0.07} />}
@@ -668,6 +671,14 @@ export default function MarketMap({ competitors }: Props) {
           onAdded={() => { setShowAddModal(false); window.location.reload() }}
         />
       )}
+
+      <CompetitorDrawer
+        competitor={selected}
+        onClose={() => setSelected(null)}
+        onSynced={(lastSyncedAt) => {
+          if (selected) setSelected({ ...selected, last_synced_at: lastSyncedAt })
+        }}
+      />
     </div>
   )
 }
